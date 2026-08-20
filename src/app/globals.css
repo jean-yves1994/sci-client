@@ -1,0 +1,224 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * Theme tokens.
+ *
+ * Light and dark are two value sets behind the same names, so components never
+ * carry `dark:` variants and charts can reference the tokens directly in SVG
+ * attributes. Values are space-separated RGB triples so Tailwind's
+ * `<alpha-value>` syntax works (`bg-surface/60`).
+ */
+
+@layer base {
+  :root {
+    /* Surfaces — four steps of elevation, not one flat colour. */
+    --canvas: 247 248 250;
+    --surface: 255 255 255;
+    --surface-2: 249 250 251;
+    --surface-3: 243 244 246;
+
+    --line: 233 236 240;
+    --line-strong: 218 222 228;
+
+    --ink: 17 24 39;
+    --ink-muted: 100 112 130;
+    --ink-faint: 147 157 172;
+    --ink-inverse: 255 255 255;
+
+    --brand-50: 239 244 255;
+    --brand-100: 219 231 255;
+    --brand-200: 191 212 255;
+    --brand-400: 96 137 250;
+    --brand-500: 59 105 240;
+    --brand-600: 43 82 212;
+    --brand-700: 33 66 168;
+
+    --success-bg: 231 246 238;
+    --success-fg: 15 122 69;
+    --success-solid: 22 150 86;
+
+    --warning-bg: 254 243 226;
+    --warning-fg: 168 91 6;
+    --warning-solid: 217 119 6;
+
+    --danger-bg: 253 236 236;
+    --danger-fg: 180 35 24;
+    --danger-solid: 217 45 32;
+
+    --info-bg: 234 240 254;
+    --info-fg: 43 82 212;
+    --info-solid: 59 105 240;
+
+    --neutral-bg: 240 241 244;
+    --neutral-fg: 75 85 99;
+    --neutral-solid: 107 114 128;
+
+    --accent-bg: 241 236 254;
+    --accent-fg: 101 57 192;
+    --accent-solid: 124 77 214;
+
+    /* Chart palette — ordered so adjacent series stay distinguishable, and
+       chosen to remain separable for the commonest colour-vision deficiencies. */
+    --chart-1: 59 105 240;
+    --chart-2: 22 150 86;
+    --chart-3: 217 119 6;
+    --chart-4: 124 77 214;
+    --chart-5: 217 45 32;
+    --chart-6: 8 145 178;
+    --chart-grid: 233 236 240;
+    --chart-axis: 147 157 172;
+
+    --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 2px 8px rgb(16 24 40 / 0.04);
+    --shadow-lift: 0 4px 16px rgb(16 24 40 / 0.08);
+    --shadow-pop: 0 16px 48px rgb(16 24 40 / 0.16);
+  }
+
+  .dark {
+    /* Not pure black: a slightly blue-tinted near-black reduces the harshness
+       of large dark areas and lets elevation read as genuinely lighter. */
+    --canvas: 12 15 22;
+    --surface: 20 24 33;
+    --surface-2: 26 31 41;
+    --surface-3: 33 39 51;
+
+    --line: 39 46 60;
+    --line-strong: 55 64 81;
+
+    --ink: 235 238 243;
+    --ink-muted: 155 165 182;
+    --ink-faint: 118 128 145;
+    --ink-inverse: 12 15 22;
+
+    --brand-50: 25 35 62;
+    --brand-100: 31 47 88;
+    --brand-200: 40 63 122;
+    --brand-400: 122 158 255;
+    --brand-500: 99 140 253;
+    --brand-600: 122 158 255;
+    --brand-700: 158 185 255;
+
+    /* Status tints are dark, low-saturation surfaces with bright foregrounds:
+       inverting the light values directly would produce unreadable mud. */
+    --success-bg: 16 46 33;
+    --success-fg: 109 216 158;
+    --success-solid: 52 190 118;
+
+    --warning-bg: 56 39 13;
+    --warning-fg: 250 196 106;
+    --warning-solid: 240 166 48;
+
+    --danger-bg: 58 24 24;
+    --danger-fg: 253 154 146;
+    --danger-solid: 240 96 84;
+
+    --info-bg: 24 38 72;
+    --info-fg: 141 174 255;
+    --info-solid: 99 140 253;
+
+    --neutral-bg: 33 39 51;
+    --neutral-fg: 170 179 194;
+    --neutral-solid: 130 140 156;
+
+    --accent-bg: 42 31 71;
+    --accent-fg: 189 160 255;
+    --accent-solid: 158 118 250;
+
+    /* Chart hues are lifted in lightness for contrast against the dark canvas. */
+    --chart-1: 99 140 253;
+    --chart-2: 52 190 118;
+    --chart-3: 240 166 48;
+    --chart-4: 158 118 250;
+    --chart-5: 240 96 84;
+    --chart-6: 45 190 214;
+    --chart-grid: 39 46 60;
+    --chart-axis: 118 128 145;
+
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.30), 0 2px 8px rgb(0 0 0 / 0.24);
+    --shadow-lift: 0 4px 16px rgb(0 0 0 / 0.40);
+    --shadow-pop: 0 16px 48px rgb(0 0 0 / 0.55);
+  }
+
+  html, body {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-canvas text-ink antialiased;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04';
+  }
+
+  /* Theme changes animate on colour only. Transitioning `all` would drag
+     layout properties through the switch and make it feel sluggish. */
+  .theme-transition,
+  .theme-transition * {
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease,
+      color 180ms ease,
+      fill 180ms ease,
+      stroke 180ms ease !important;
+  }
+
+  /* A single visible focus treatment, so keyboard users can always see where
+     they are without a ring appearing on every mouse click. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--brand-500));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: rgb(var(--brand-500) / 0.22);
+  }
+}
+
+@layer utilities {
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Scrollbars follow the theme; a light gutter inside a dark panel is one of
+     the clearest signs a dark mode was applied only skin-deep. */
+  .scroll-slim {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--line-strong)) transparent;
+  }
+  .scroll-slim::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scroll-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scroll-slim::-webkit-scrollbar-thumb {
+    background: rgb(var(--line-strong));
+    border-radius: 999px;
+  }
+  .scroll-slim::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--ink-faint));
+  }
+}
+
+/* The native date picker glyph is dark by default and disappears on a dark
+   surface, so it is inverted with the theme. */
+.dark input[type='date']::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.5;
+}
+input[type='date']::-webkit-calendar-picker-indicator {
+  opacity: 0.45;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

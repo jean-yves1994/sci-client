@@ -1,0 +1,125 @@
+import type { Tone } from '@/components/ui';
+
+const STATUS_LABELS: Record<string, string> = {
+  ASSIGNED: 'Assigned', IN_PROGRESS: 'In progress', SUBMITTED: 'Submitted',
+  UNDER_REVIEW: 'Under review', CORRECTION_REQUESTED: 'Needs correction',
+  RESUBMITTED: 'Resubmitted', APPROVED: 'Approved', REJECTED: 'Rejected',
+  REPORT_GENERATED: 'Report ready', ARCHIVED: 'Archived',
+};
+
+/**
+ * Status → tone. Colour is a second channel here, never the only one: every
+ * badge also carries its label as text.
+ */
+const STATUS_TONES: Record<string, Tone> = {
+  ASSIGNED: 'neutral', IN_PROGRESS: 'info', SUBMITTED: 'warning',
+  UNDER_REVIEW: 'warning', RESUBMITTED: 'warning', CORRECTION_REQUESTED: 'accent',
+  APPROVED: 'success', REPORT_GENERATED: 'success', REJECTED: 'danger', ARCHIVED: 'neutral',
+};
+
+const PRIORITY_TONES: Record<string, Tone> = {
+  LOW: 'neutral', NORMAL: 'neutral', HIGH: 'warning', URGENT: 'danger',
+};
+
+/** Chart colour per status, so the donut agrees with the badges beside it. */
+export const STATUS_CHART_COLOUR: Record<string, string> = {
+  ASSIGNED: 'rgb(var(--neutral-solid))',
+  IN_PROGRESS: 'rgb(var(--chart-1))',
+  SUBMITTED: 'rgb(var(--chart-3))',
+  UNDER_REVIEW: 'rgb(var(--chart-3))',
+  RESUBMITTED: 'rgb(var(--chart-3))',
+  CORRECTION_REQUESTED: 'rgb(var(--chart-4))',
+  APPROVED: 'rgb(var(--chart-2))',
+  REPORT_GENERATED: 'rgb(var(--chart-2))',
+  REJECTED: 'rgb(var(--chart-5))',
+  ARCHIVED: 'rgb(var(--chart-axis))',
+};
+
+export const statusLabel = (s: string) => STATUS_LABELS[s] ?? humanise(s);
+export const statusTone = (s: string): Tone => STATUS_TONES[s] ?? 'neutral';
+export const priorityTone = (p: string): Tone => PRIORITY_TONES[p] ?? 'neutral';
+
+export function humanise(value: string | null | undefined): string {
+  if (!value) return '—';
+  return value.split('_').map((p) => p.charAt(0) + p.slice(1).toLowerCase()).join(' ');
+}
+
+export function formatDate(value: string | null | undefined): string {
+  if (!value) return '—';
+  return new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+export function formatDateTime(value: string | null | undefined): string {
+  if (!value) return '—';
+  return new Date(value).toLocaleString('en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+}
+
+export function formatMoney(value: string | number | null | undefined, currency = 'RWF'): string {
+  if (value === null || value === undefined || value === '') return '—';
+  const n = typeof value === 'string' ? Number(value) : value;
+  if (Number.isNaN(n)) return '—';
+  return `${currency} ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(n)}`;
+}
+
+export function compactNumber(value: number): string {
+  if (Math.abs(value) < 1000) return String(value);
+  return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+}
+
+export function fullName(person: { firstName: string; lastName: string } | null | undefined): string {
+  if (!person) return 'Unassigned';
+  return `${person.firstName} ${person.lastName}`;
+}
+
+export function initials(person: { firstName: string; lastName: string } | null | undefined): string {
+  if (!person) return '—';
+  return `${person.firstName.charAt(0)}${person.lastName.charAt(0)}`.toUpperCase();
+}
+
+/**
+ * Deterministic avatar tint from a stable key, so the same person keeps the
+ * same colour on every screen instead of flickering between renders.
+ */
+export function avatarTone(key: string): Tone {
+  const palette: Tone[] = ['brand', 'success', 'warning', 'accent', 'info', 'neutral'];
+  let hash = 0;
+  for (let i = 0; i < key.length; i += 1) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  return palette[hash % palette.length];
+}
+
+export function timeAgo(value: string): string {
+  const diff = Date.now() - new Date(value).getTime();
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return formatDate(value);
+}
+
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+/** "2026-08" → "Aug". The API returns ISO year-month buckets. */
+export function monthLabel(bucket: string): string {
+  const index = Number(bucket.slice(5)) - 1;
+  return MONTH_NAMES[index] ?? bucket;
+}
+
+/**
+ * Percentage change between the two most recent periods.
+ *
+ * Returns null rather than 0 when there is no meaningful basis for comparison
+ * (fewer than two periods, or a zero baseline). A KPI card showing "0%" implies
+ * a real measurement of no change, which would be a fabrication.
+ */
+export function periodChange(series: number[]): number | null {
+  if (series.length < 2) return null;
+  const current = series[series.length - 1];
+  const previous = series[series.length - 2];
+  if (previous === 0) return null;
+  return Math.round(((current - previous) / previous) * 100);
+}
