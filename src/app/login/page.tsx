@@ -21,7 +21,7 @@ function describeError(error: unknown): FormError {
   if (error instanceof NetworkError) {
     return {
       title: 'Cannot reach the server.',
-      hint: 'Start the API (npm run dev in the backend folder) and check NEXT_PUBLIC_API_URL in web/.env.local.',
+      hint: 'Check that the API is running an try again.',
     };
   }
   if (!(error instanceof ApiError)) return { title: 'Something went wrong. Please try again.' };

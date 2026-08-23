@@ -108,7 +108,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     // An aborted request is a normal part of cleanup, not a failure to report.
     if (error instanceof DOMException && error.name === 'AbortError') throw error;
     throw new NetworkError(
-      'Cannot reach the server. Check that the API is running and that NEXT_PUBLIC_API_URL is correct.',
+      'Cannot reach the server. Check that the API is running an try again.',
     );
   }
 
