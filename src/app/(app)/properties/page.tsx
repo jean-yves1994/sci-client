@@ -20,19 +20,22 @@ import {
   Th,
   Tr,
 } from "@/components/ui";
-import { IconHome, IconMapPin, IconPlus } from "@/components/icons";
+import { IconHome, IconPlus } from "@/components/icons";
 import { BranchRef, Paginated, Person, api, readableError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
 interface PropertyRow {
   id: string;
   reference: string;
+  name: string | null;
   propertyType: string;
-  addressLine: string;
-  latitude: string | null;
-  longitude: string | null;
+  ownerClientName: string | null;
+  province: string | null;
+  district: string | null;
+  sector: string | null;
+  cell: string | null;
+  villageStreet: string | null;
   branch: BranchRef;
-  division: { id: string; name: string } | null;
   _count: { inspections: number };
 }
 
@@ -47,23 +50,36 @@ interface InspectionFormState {
 interface PropertyFormState {
   reference: string;
   branchId: string;
+  name: string;
   propertyType: string;
-  addressLine: string;
-  plotNumber: string;
-  titleNumber: string;
-  latitude: string;
-  longitude: string;
+  ownerClientName: string;
+  province: string;
+  district: string;
+  sector: string;
+  cell: string;
+  villageStreet: string;
 }
+
+const PROPERTY_TYPES = [
+  "Residential",
+  "Commercial",
+  "Industrial",
+  "Agricultural",
+  "Land",
+  "Other",
+] as const;
 
 const EMPTY_PROPERTY_FORM: PropertyFormState = {
   reference: "",
   branchId: "",
-  propertyType: "Residential house",
-  addressLine: "",
-  plotNumber: "",
-  titleNumber: "",
-  latitude: "",
-  longitude: "",
+  name: "",
+  propertyType: "Residential",
+  ownerClientName: "",
+  province: "",
+  district: "",
+  sector: "",
+  cell: "",
+  villageStreet: "",
 };
 
 const EMPTY_INSPECTION_FORM: InspectionFormState = {
@@ -162,18 +178,20 @@ export default function PropertiesPage() {
     setNotice(null);
 
     try {
-      await api.post("/properties", {
-        reference: form.reference.trim(),
-        branchId: form.branchId,
-        propertyType: form.propertyType.trim(),
-        addressLine: form.addressLine.trim(),
-        plotNumber: form.plotNumber.trim() || undefined,
-        titleNumber: form.titleNumber.trim() || undefined,
-        latitude: form.latitude ? Number(form.latitude) : undefined,
-        longitude: form.longitude ? Number(form.longitude) : undefined,
+      const created = await api.post<PropertyRow>("/properties", {
+        reference: form.reference.trim() || undefined,
+        branchId: form.branchId || undefined,
+        name: form.name.trim(),
+        propertyType: form.propertyType,
+        ownerClientName: form.ownerClientName.trim(),
+        province: form.province.trim(),
+        district: form.district.trim(),
+        sector: form.sector.trim(),
+        cell: form.cell.trim(),
+        villageStreet: form.villageStreet.trim() || undefined,
       });
 
-      setNotice(`Property ${form.reference.trim()} created successfully.`);
+      setNotice(`Property ${created.reference} created successfully.`);
       setShowCreate(false);
       setForm({ ...EMPTY_PROPERTY_FORM, branchId: isInspector ? user?.branchId ?? "" : "" });
       await load();
@@ -222,8 +240,8 @@ export default function PropertiesPage() {
       <PageHeader
         title="Properties"
         description={isInspector
-          ? "Create collateral properties from the field and raise inspections for your assigned branch."
-          : "Collateral registered for inspection."}
+          ? "Create basic collateral information from the field and raise inspections for your assigned branch."
+          : "Basic collateral properties registered for inspection."}
         action={can("properties.write") ? (
           <Button icon={<IconPlus className="h-4 w-4" />} onClick={() => setShowCreate(true)}>
             Create property
@@ -236,7 +254,7 @@ export default function PropertiesPage() {
 
       <Card className="p-4">
         <SearchInput
-          placeholder="Search reference, address, plot or title number"
+          placeholder="Search reference, property name, owner or location"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           aria-label="Search properties"
@@ -250,7 +268,7 @@ export default function PropertiesPage() {
           <EmptyState
             icon={<IconHome />}
             title={debounced ? "No properties match that search" : "No properties yet"}
-            description={debounced ? "Try a different reference." : "Create one to begin raising inspections."}
+            description={debounced ? "Try a different reference, name or location." : "Create one to begin raising inspections."}
             action={can("properties.write") && !debounced ? (
               <Button onClick={() => setShowCreate(true)}>Create property</Button>
             ) : undefined}
@@ -259,18 +277,26 @@ export default function PropertiesPage() {
           <>
             <Table label="Registered properties">
               <thead><tr>
-                <Th>Reference</Th><Th>Address</Th>
+                <Th>Property</Th><Th>Owner / Client</Th><Th>Location</Th>
                 <Th className="hidden lg:table-cell">Branch</Th>
-                <Th className="hidden md:table-cell">Coordinates</Th>
                 <Th align="right">Inspections</Th><Th align="right">Actions</Th>
               </tr></thead>
               <tbody>
                 {result.data.map((property) => (
                   <Tr key={property.id}>
-                    <Td><span className="font-semibold text-ink">{property.reference}</span><span className="mt-0.5 block text-xs text-ink-faint">{property.propertyType}</span></Td>
-                    <Td><span className="block max-w-[260px] truncate">{property.addressLine}</span>{property.division && <span className="mt-0.5 block text-xs text-ink-faint">{property.division.name}</span>}</Td>
+                    <Td>
+                      <span className="font-semibold text-ink">{property.reference}</span>
+                      <span className="mt-0.5 block text-sm text-ink">{property.name || "Unnamed property"}</span>
+                      <span className="mt-0.5 block text-xs text-ink-faint">{property.propertyType}</span>
+                    </Td>
+                    <Td>{property.ownerClientName || <span className="text-ink-faint">Not provided</span>}</Td>
+                    <Td>
+                      <span className="block max-w-[300px] truncate">
+                        {[property.district, property.sector, property.cell].filter(Boolean).join(", ") || "Location not provided"}
+                      </span>
+                      {property.province && <span className="mt-0.5 block text-xs text-ink-faint">{property.province}{property.villageStreet ? ` · ${property.villageStreet}` : ""}</span>}
+                    </Td>
                     <Td className="hidden text-sm text-ink-muted lg:table-cell">{property.branch.code}</Td>
-                    <Td className="hidden md:table-cell">{property.latitude !== null && property.longitude !== null ? <span className="inline-flex items-center gap-1.5 text-xs tabular-nums text-ink-muted"><IconMapPin className="h-3.5 w-3.5 text-success-fg" />{Number(property.latitude).toFixed(4)}, {Number(property.longitude).toFixed(4)}</span> : <Badge tone="warning">Not set</Badge>}</Td>
                     <Td align="right" className="tabular-nums">{property._count.inspections}</Td>
                     <Td align="right">{can("inspections.create") && <Button size="sm" variant="secondary" onClick={() => setRaiseFor(property)}>Raise inspection</Button>}</Td>
                   </Tr>
@@ -286,13 +312,13 @@ export default function PropertiesPage() {
         open={showCreate}
         onClose={closeCreate}
         title="Create property"
-        description={isInspector ? "Register the collateral at your assigned branch before raising the inspection." : "Coordinates are optional, but without them a GPS capture cannot be verified."}
+        description="Enter only the basic property information. Detailed collateral information will be captured during the inspection."
         width="lg"
         footer={<><Button variant="secondary" onClick={closeCreate}>Cancel</Button><Button form="property-form" type="submit" loading={busy}>Create property</Button></>}
       >
         <form id="property-form" onSubmit={createProperty} className="grid gap-4 sm:grid-cols-2">
-          <Field label="Reference" required htmlFor="property-reference">
-            <Input id="property-reference" name="reference" required value={form.reference} placeholder="PROP-2026-0004" onChange={setPropertyField("reference")} />
+          <Field label="Property reference" hint="Leave blank to generate automatically." htmlFor="property-reference">
+            <Input id="property-reference" name="reference" value={form.reference} placeholder="PROP-2026-0001" onChange={setPropertyField("reference")} />
           </Field>
 
           {isInspector ? (
@@ -308,13 +334,36 @@ export default function PropertiesPage() {
             </Field>
           )}
 
-          <Field label="Property type" required htmlFor="property-type"><Input id="property-type" name="propertyType" required value={form.propertyType} onChange={setPropertyField("propertyType")} /></Field>
-          <Field label="Plot number" htmlFor="property-plot"><Input id="property-plot" name="plotNumber" value={form.plotNumber} onChange={setPropertyField("plotNumber")} /></Field>
-          <div className="sm:col-span-2"><Field label="Address" required htmlFor="property-address"><Input id="property-address" name="addressLine" required value={form.addressLine} onChange={setPropertyField("addressLine")} /></Field></div>
-          <Field label="Title number" htmlFor="property-title"><Input id="property-title" name="titleNumber" value={form.titleNumber} onChange={setPropertyField("titleNumber")} /></Field>
-          <div />
-          <Field label="Latitude" hint="e.g. -1.9536" htmlFor="property-latitude"><Input id="property-latitude" name="latitude" type="number" step="any" value={form.latitude} onChange={setPropertyField("latitude")} /></Field>
-          <Field label="Longitude" hint="e.g. 30.0928" htmlFor="property-longitude"><Input id="property-longitude" name="longitude" type="number" step="any" value={form.longitude} onChange={setPropertyField("longitude")} /></Field>
+          <div className="sm:col-span-2">
+            <Field label="Property name / description" required htmlFor="property-name">
+              <Input id="property-name" name="name" required value={form.name} placeholder="Kigali Commercial Building" onChange={setPropertyField("name")} />
+            </Field>
+          </div>
+
+          <Field label="Property type" required htmlFor="property-type">
+            <Select id="property-type" name="propertyType" required value={form.propertyType} onChange={setPropertyField("propertyType")}>
+              {PROPERTY_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+            </Select>
+          </Field>
+
+          <Field label="Owner / client name" required htmlFor="property-owner">
+            <Input id="property-owner" name="ownerClientName" required value={form.ownerClientName} placeholder="John Doe" onChange={setPropertyField("ownerClientName")} />
+          </Field>
+
+          <div className="sm:col-span-2 pt-2">
+            <h3 className="text-sm font-semibold text-ink">Location</h3>
+            <p className="mt-1 text-xs text-ink-muted">Enter the basic administrative location of the property.</p>
+          </div>
+
+          <Field label="Province" required htmlFor="property-province"><Input id="property-province" name="province" required value={form.province} placeholder="Kigali" onChange={setPropertyField("province")} /></Field>
+          <Field label="District" required htmlFor="property-district"><Input id="property-district" name="district" required value={form.district} placeholder="Gasabo" onChange={setPropertyField("district")} /></Field>
+          <Field label="Sector" required htmlFor="property-sector"><Input id="property-sector" name="sector" required value={form.sector} placeholder="Kimironko" onChange={setPropertyField("sector")} /></Field>
+          <Field label="Cell" required htmlFor="property-cell"><Input id="property-cell" name="cell" required value={form.cell} placeholder="Nyagatovu" onChange={setPropertyField("cell")} /></Field>
+          <div className="sm:col-span-2">
+            <Field label="Village / Street" hint="Optional where applicable." htmlFor="property-village-street">
+              <Input id="property-village-street" name="villageStreet" value={form.villageStreet} placeholder="KG 11 Ave" onChange={setPropertyField("villageStreet")} />
+            </Field>
+          </div>
         </form>
       </Modal>
 
@@ -322,7 +371,7 @@ export default function PropertiesPage() {
         open={raiseFor !== null}
         onClose={closeRaise}
         title="Raise inspection"
-        description={raiseFor ? `${raiseFor.reference} — ${raiseFor.addressLine}` : undefined}
+        description={raiseFor ? `${raiseFor.reference} — ${raiseFor.name || "Property"}` : undefined}
         footer={<><Button variant="secondary" onClick={closeRaise}>Cancel</Button><Button form="inspection-form" type="submit" loading={busy}>Raise inspection</Button></>}
       >
         <form id="inspection-form" onSubmit={raiseInspection} className="space-y-4">
