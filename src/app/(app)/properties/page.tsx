@@ -183,6 +183,15 @@ export default function PropertiesPage() {
     setError(null);
     setNotice(null);
 
+    const plotNumber = form.plotNumber.trim();
+    const titleNumber = form.titleNumber.trim();
+
+    if (!plotNumber || !titleNumber) {
+      setError("Plot number and UPI are required.");
+      setBusy(false);
+      return;
+    }
+
     try {
       const created = await api.post<PropertyRow>("/properties", {
         reference: form.reference.trim() || undefined,
@@ -190,8 +199,8 @@ export default function PropertiesPage() {
         name: form.name.trim(),
         propertyType: form.propertyType,
         ownerClientName: form.ownerClientName.trim(),
-        plotNumber: form.plotNumber.trim() || undefined,
-        titleNumber: form.titleNumber.trim() || undefined,
+        plotNumber,
+        titleNumber,
         province: form.province.trim(),
         district: form.district.trim(),
         sector: form.sector.trim(),
@@ -320,7 +329,7 @@ export default function PropertiesPage() {
         open={showCreate}
         onClose={closeCreate}
         title="Create property"
-        description="Enter the basic property information, including land registration details. Detailed collateral information will be captured during the inspection."
+        description="Enter the basic property information. Plot number and UPI are required for every property."
         width="lg"
         footer={<><Button variant="secondary" onClick={closeCreate}>Cancel</Button><Button form="property-form" type="submit" loading={busy}>Create property</Button></>}
       >
@@ -360,15 +369,15 @@ export default function PropertiesPage() {
 
           <div className="sm:col-span-2 pt-2">
             <h3 className="text-sm font-semibold text-ink">Land registration</h3>
-            <p className="mt-1 text-xs text-ink-muted">Optional cadastral and land title references.</p>
+            <p className="mt-1 text-xs text-ink-muted">Plot number and UPI are required for every property.</p>
           </div>
 
-          <Field label="Plot number" hint="Optional." htmlFor="property-plot-number">
-            <Input id="property-plot-number" name="plotNumber" value={form.plotNumber} placeholder="1234" onChange={setPropertyField("plotNumber")} />
+          <Field label="Plot number" hint="Required." required htmlFor="property-plot-number">
+            <Input id="property-plot-number" name="plotNumber" required value={form.plotNumber} placeholder="1234" onChange={setPropertyField("plotNumber")} />
           </Field>
 
-          <Field label="UPI" hint="Optional land title reference." htmlFor="property-upi">
-            <Input id="property-upi" name="titleNumber" value={form.titleNumber} placeholder="1/03/07/04/1234" onChange={setPropertyField("titleNumber")} />
+          <Field label="UPI" hint="Required land title reference." required htmlFor="property-upi">
+            <Input id="property-upi" name="titleNumber" required value={form.titleNumber} placeholder="1/03/07/04/1234" onChange={setPropertyField("titleNumber")} />
           </Field>
 
           <div className="sm:col-span-2 pt-2">
