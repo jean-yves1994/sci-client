@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import * as React from "react";
-import { Alert, Button, Card, Field, Input } from "@/components/ui";
+import { Alert, Button, Field, Input } from "@/components/ui";
 import { ThemeToggle } from "@/components/shell";
 import { ApiError, NetworkError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -155,29 +155,6 @@ export default function LoginPage() {
               Sign in
             </Button>
           </form>
-
-          <Card className="mt-6 p-4">
-            <p className="mb-2.5 text-2xs font-semibold uppercase tracking-wide text-ink-faint">
-              Seeded accounts
-            </p>
-            <dl className="space-y-1.5 text-xs">
-              {[
-                ["admin@global.rw", "Administrator", "Admin@123456"],
-                ["reviewer@sci.rw", "Reviewer", "Demo@12345678"],
-                ["inspector@sci.rw", "Inspector", "Demo@12345678"],
-              ].map(([address, role, secret]) => (
-                <div
-                  key={address}
-                  className="flex items-center justify-between gap-3"
-                >
-                  <dt className="font-mono text-ink">{address}</dt>
-                  <dd className="text-ink-faint">
-                    {role} · {secret}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </Card>
         </div>
       </div>
 
