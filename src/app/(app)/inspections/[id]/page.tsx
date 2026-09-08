@@ -19,6 +19,14 @@ import type { Tone } from '@/components/ui';
 
 type DecisionKind = 'approve' | 'reject' | 'correction' | null;
 
+type InspectionProperty = InspectionDetail['property'] & {
+  province?: string | null;
+  district?: string | null;
+  sector?: string | null;
+  cell?: string | null;
+  villageStreet?: string | null;
+};
+
 const PROXIMITY_TONE: Record<string, Tone> = {
   AT_PROPERTY: 'success', NEARBY: 'warning', DISTANT: 'danger', UNVERIFIABLE: 'neutral',
 };
@@ -105,6 +113,13 @@ export default function InspectionDetailPage() {
 
   const latestReport = inspection.reports[0];
   const openCorrection = inspection.corrections.find((c) => !c.resolvedAt);
+  const property = inspection.property as InspectionProperty;
+
+  const locationParts = [property.province, property.district, property.sector, property.cell]
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part));
+  const locationValue = locationParts.length > 0 ? locationParts.join(' · ') : property.division?.name ?? '—';
+  const addressValue = property.addressLine?.trim() || property.villageStreet?.trim() || locationValue;
 
   const downloadReport = async (reportId: string) => {
     const { url } = await api.get<{ url: string }>(`/reports/${reportId}/download`);
@@ -137,7 +152,7 @@ export default function InspectionDetailPage() {
             </div>
 
             <p className="mt-1.5 text-sm text-ink-muted">
-              {inspection.loanReference} · {inspection.property.reference} · {inspection.property.addressLine}
+              {inspection.loanReference} · {inspection.property.reference} · {addressValue}
             </p>
 
             <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-2.5">
@@ -221,12 +236,12 @@ export default function InspectionDetailPage() {
             <Card>
               <CardHeader title="Property" />
               <dl className="space-y-2.5 px-5 pb-5 text-sm">
-                <Detail label="Reference" value={inspection.property.reference} />
-                <Detail label="Type" value={inspection.property.propertyType} />
-                <Detail label="Address" value={inspection.property.addressLine} />
-                <Detail label="Location" value={inspection.property.division?.name ?? '—'} />
-                <Detail label="Plot" value={inspection.property.plotNumber ?? '—'} />
-                <Detail label="Title" value={inspection.property.titleNumber ?? '—'} />
+                <Detail label="Reference" value={property.reference} />
+                <Detail label="Type" value={property.propertyType} />
+                <Detail label="Address" value={addressValue} />
+                <Detail label="Location" value={locationValue} />
+                <Detail label="UPI" value={property.titleNumber ?? '—'} />
+                <Detail label="Plot number" value={property.plotNumber ?? '—'} />
               </dl>
             </Card>
 
