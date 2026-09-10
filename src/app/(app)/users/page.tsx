@@ -42,6 +42,19 @@ export default function UsersPage() {
     employeeNumber: '', branchId: '', roleCode: 'INSPECTOR', branchScope: 'OWN_BRANCH',
   });
 
+  // Keep modal callbacks referentially stable. The shared Modal uses its
+  // onClose callback as an effect dependency; an inline callback here would
+  // change on every keystroke and restart the modal's focus timer, returning
+  // focus to the first field (First name).
+  const closeCreate = React.useCallback(() => {
+    setShowCreate(false);
+  }, []);
+
+  const closeReset = React.useCallback(() => {
+    setResetFor(null);
+    setNewPassword('');
+  }, []);
+
   const [debounced, setDebounced] = React.useState('');
   React.useEffect(() => {
     const timer = setTimeout(() => setDebounced(search), 300);
@@ -230,8 +243,6 @@ export default function UsersPage() {
                               Reset
                             </Button>
                           )}
-                          {/* Suspending your own account would lock you out of
-                              the system you are administering. */}
                           {can('users.write') && person.id !== currentUser?.id && (
                             <Button
                               size="sm" variant="ghost" disabled={busy}
@@ -265,11 +276,11 @@ export default function UsersPage() {
       </Card>
 
       <Modal
-        open={showCreate} onClose={() => setShowCreate(false)} title="Add user" width="lg"
+        open={showCreate} onClose={closeCreate} title="Add user" width="lg"
         description="The user must replace this password at first sign-in."
         footer={
           <>
-            <Button variant="secondary" onClick={() => setShowCreate(false)}>Cancel</Button>
+            <Button variant="secondary" onClick={closeCreate}>Cancel</Button>
             <Button form="user-form" type="submit" loading={busy}>Create user</Button>
           </>
         }
@@ -335,17 +346,14 @@ export default function UsersPage() {
 
       <Modal
         open={resetFor !== null}
-        onClose={() => { setResetFor(null); setNewPassword(''); }}
+        onClose={closeReset}
         title="Reset password"
         description={
           resetFor ? `${resetFor.firstName} ${resetFor.lastName} — ${resetFor.email}` : undefined
         }
         footer={
           <>
-            <Button
-              variant="secondary"
-              onClick={() => { setResetFor(null); setNewPassword(''); }}
-            >
+            <Button variant="secondary" onClick={closeReset}>
               Cancel
             </Button>
             <Button
@@ -356,7 +364,7 @@ export default function UsersPage() {
                 void act(
                   () => api.post(`/users/${target.id}/reset-password`, { newPassword }),
                   'Password reset. Every session for that account has been ended.',
-                ).then(() => { setResetFor(null); setNewPassword(''); });
+                ).then(closeReset);
               }}
             >
               Reset password
