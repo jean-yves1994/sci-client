@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Alert, Badge, Button, Card, CardHeader, Field, Textarea } from '@/components/ui';
+import { Alert, Badge, Button, Card, CardHeader, Field } from '@/components/ui';
 import { ApiError, InspectionDetail, api, readableError } from '@/lib/api';
 import { formatDateTime, formatMoney, fullName, humanise } from '@/lib/format';
 
@@ -74,7 +74,7 @@ export function ProfessionalReviewPanel({ inspectionId }: { inspectionId: string
         <CardHeader title="Reviewer risk" description="Professional risk classification with reviewer comments." />
         <div className="space-y-3 px-5 pb-5">
           <Field label="Risk level"><select value={risk} disabled={!editable || busy} onChange={e => setRisk(e.target.value)} className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink"><option>LOW</option><option>MEDIUM</option><option>HIGH</option></select></Field>
-          <Textarea label="Risk comments" value={riskComments} disabled={!editable || busy} onChange={e => setRiskComments(e.target.value)} placeholder="Explain material risks, inconsistencies or concerns…" />
+          <Field label="Risk comments"><textarea value={riskComments} disabled={!editable || busy} onChange={e => setRiskComments(e.target.value)} placeholder="Explain material risks, inconsistencies or concerns…" className="min-h-28 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink-faint focus:border-primary focus:ring-2 focus:ring-primary/10" /></Field>
           <Button loading={busy} disabled={!editable || !inspection.reviewer} onClick={() => void run(() => api.patch(`/inspections/${inspectionId}/review/risk`, { level: risk, comments: riskComments, baseVersion: version }), 'Risk assessment saved.')}>Save risk</Button>
         </div>
       </Card>
@@ -93,7 +93,7 @@ export function ProfessionalReviewPanel({ inspectionId }: { inspectionId: string
 
     <Card>
       <CardHeader title="Reviewer conclusion" description="This becomes part of the professional review record and official decision trail." />
-      <div className="px-5 pb-5 space-y-3"><Textarea label="Conclusion" value={conclusion} disabled={!editable || busy} onChange={e => setConclusion(e.target.value)} placeholder="Summarise professional findings, material exceptions and recommendation…" /><Button loading={busy} disabled={!editable || !conclusion.trim() || !inspection.reviewer} onClick={() => void run(() => api.patch(`/inspections/${inspectionId}/review/conclusion`, { conclusion, baseVersion: version }), 'Conclusion saved.')}>Save conclusion</Button></div>
+      <div className="px-5 pb-5 space-y-3"><Field label="Conclusion"><textarea value={conclusion} disabled={!editable || busy} onChange={e => setConclusion(e.target.value)} placeholder="Summarise professional findings, material exceptions and recommendation…" className="min-h-32 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink-faint focus:border-primary focus:ring-2 focus:ring-primary/10" /></Field><Button loading={busy} disabled={!editable || !conclusion.trim() || !inspection.reviewer} onClick={() => void run(() => api.patch(`/inspections/${inspectionId}/review/conclusion`, { conclusion, baseVersion: version }), 'Conclusion saved.')}>Save conclusion</Button></div>
     </Card>
 
     <Card>
