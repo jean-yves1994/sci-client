@@ -1,25 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  Alert,
-  Badge,
-  Button,
-  Card,
-  EmptyState,
-  Field,
-  Input,
-  Modal,
-  PageHeader,
-  Pagination,
-  SearchInput,
-  Select,
-  Table,
-  TableSkeleton,
-  Td,
-  Th,
-  Tr,
-} from "@/components/ui";
+import { Alert, Badge, Button, Card, EmptyState, Field, Input, Modal, PageHeader, Pagination, SearchInput, Select, Table, TableSkeleton, Td, Th, Tr } from "@/components/ui";
 import { IconHome, IconPlus } from "@/components/icons";
 import { BranchRef, Paginated, Person, api, readableError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -35,71 +17,20 @@ interface PropertyRow {
   sector: string | null;
   cell: string | null;
   villageStreet: string | null;
-  plotNumber: string | null;
   titleNumber: string | null;
   branch: BranchRef;
   _count: { inspections: number };
 }
+interface InspectionFormState { loanReference: string; clientName: string; inspectorId: string; priority: string; dueDate: string; }
+interface PropertyFormState { branchId: string; name: string; propertyType: string; ownerClientName: string; titleNumber: string; province: string; district: string; sector: string; cell: string; villageStreet: string; }
 
-interface InspectionFormState {
-  loanReference: string;
-  clientName: string;
-  inspectorId: string;
-  priority: string;
-  dueDate: string;
-}
-
-interface PropertyFormState {
-  reference: string;
-  branchId: string;
-  name: string;
-  propertyType: string;
-  ownerClientName: string;
-  plotNumber: string;
-  titleNumber: string;
-  province: string;
-  district: string;
-  sector: string;
-  cell: string;
-  villageStreet: string;
-}
-
-const PROPERTY_TYPES = [
-  "Residential",
-  "Commercial",
-  "Industrial",
-  "Agricultural",
-  "Land",
-  "Other",
-] as const;
-
-const EMPTY_PROPERTY_FORM: PropertyFormState = {
-  reference: "",
-  branchId: "",
-  name: "",
-  propertyType: "Residential",
-  ownerClientName: "",
-  plotNumber: "",
-  titleNumber: "",
-  province: "",
-  district: "",
-  sector: "",
-  cell: "",
-  villageStreet: "",
-};
-
-const EMPTY_INSPECTION_FORM: InspectionFormState = {
-  loanReference: "",
-  clientName: "",
-  inspectorId: "",
-  priority: "NORMAL",
-  dueDate: "",
-};
+const PROPERTY_TYPES = ["Residential", "Commercial", "Industrial", "Agricultural", "Land", "Other"] as const;
+const EMPTY_PROPERTY_FORM: PropertyFormState = { branchId: "", name: "", propertyType: "Residential", ownerClientName: "", titleNumber: "", province: "", district: "", sector: "", cell: "", villageStreet: "" };
+const EMPTY_INSPECTION_FORM: InspectionFormState = { loanReference: "", clientName: "", inspectorId: "", priority: "NORMAL", dueDate: "" };
 
 export default function PropertiesPage() {
   const { can, user } = useAuth();
   const isInspector = user?.roles.includes("INSPECTOR") ?? false;
-
   const [result, setResult] = React.useState<Paginated<PropertyRow> | null>(null);
   const [branches, setBranches] = React.useState<BranchRef[]>([]);
   const [inspectors, setInspectors] = React.useState<Person[]>([]);
@@ -108,325 +39,79 @@ export default function PropertiesPage() {
   const [loading, setLoading] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
   const [search, setSearch] = React.useState("");
+  const [debounced, setDebounced] = React.useState("");
   const [page, setPage] = React.useState(1);
   const [showCreate, setShowCreate] = React.useState(false);
   const [raiseFor, setRaiseFor] = React.useState<PropertyRow | null>(null);
   const [form, setForm] = React.useState<PropertyFormState>(EMPTY_PROPERTY_FORM);
   const [inspectionForm, setInspectionForm] = React.useState<InspectionFormState>(EMPTY_INSPECTION_FORM);
-  const [debounced, setDebounced] = React.useState("");
 
-  const setPropertyField = React.useCallback(
-    (field: keyof PropertyFormState) =>
-      (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-        setForm((previous) => ({ ...previous, [field]: event.target.value })),
-    [],
-  );
-
-  const setInspectionField = React.useCallback(
-    (field: keyof InspectionFormState) =>
-      (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-        setInspectionForm((previous) => ({ ...previous, [field]: event.target.value })),
-    [],
-  );
-
-  const closeCreate = React.useCallback(() => setShowCreate(false), []);
-  const closeRaise = React.useCallback(() => setRaiseFor(null), []);
-
-  React.useEffect(() => {
-    const timer = setTimeout(() => setDebounced(search), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-
+  React.useEffect(() => { const timer = setTimeout(() => setDebounced(search), 300); return () => clearTimeout(timer); }, [search]);
   React.useEffect(() => setPage(1), [debounced]);
-
-  const load = React.useCallback(async () => {
-    setLoading(true);
-    const params = new URLSearchParams({ page: String(page), pageSize: "20" });
-    if (debounced.trim()) params.set("search", debounced.trim());
-
-    try {
-      setResult(await api.get<Paginated<PropertyRow>>(`/properties?${params}`));
-    } catch (caught) {
-      setError(readableError(caught));
-    } finally {
-      setLoading(false);
-    }
-  }, [page, debounced]);
-
+  React.useEffect(() => { if (isInspector && user?.branchId) setForm((p) => ({ ...p, branchId: user.branchId ?? "" })); }, [isInspector, user?.branchId]);
   React.useEffect(() => {
-    void load();
-  }, [load]);
-
-  React.useEffect(() => {
-    if (can("branches.read")) {
-      api.get<Paginated<BranchRef>>("/branches?page=1&pageSize=100")
-        .then((response) => setBranches(response.data))
-        .catch(() => setBranches([]));
-    }
-
-    if (can("inspections.assign")) {
-      api.get<Person[]>("/users/inspectors")
-        .then(setInspectors)
-        .catch(() => setInspectors([]));
-    }
+    if (can("branches.read")) api.get<Paginated<BranchRef>>("/branches?page=1&pageSize=100").then((r) => setBranches(r.data)).catch(() => setBranches([]));
+    if (can("inspections.assign")) api.get<Person[]>("/users/inspectors").then(setInspectors).catch(() => setInspectors([]));
   }, [can]);
 
-  React.useEffect(() => {
-    if (isInspector && user?.branchId) {
-      setForm((previous) => ({ ...previous, branchId: user.branchId ?? "" }));
-    }
-  }, [isInspector, user?.branchId]);
+  const load = React.useCallback(async () => {
+    setLoading(true); setError(null);
+    try { const p = new URLSearchParams({ page: String(page), pageSize: "20" }); if (debounced.trim()) p.set("search", debounced.trim()); setResult(await api.get<Paginated<PropertyRow>>(`/properties?${p}`)); }
+    catch (e) { setError(readableError(e)); } finally { setLoading(false); }
+  }, [page, debounced]);
+  React.useEffect(() => { void load(); }, [load]);
+
+  const setPropertyField = (field: keyof PropertyFormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm((p) => ({ ...p, [field]: e.target.value }));
+  const setInspectionField = (field: keyof InspectionFormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setInspectionForm((p) => ({ ...p, [field]: e.target.value }));
+  const inspectorBranch = branches.find((b) => b.id === user?.branchId);
 
   const createProperty = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
-    setNotice(null);
-
-    const plotNumber = form.plotNumber.trim();
-    const titleNumber = form.titleNumber.trim();
-
-    if (!plotNumber || !titleNumber) {
-      setError("Plot number and UPI are required.");
-      setBusy(false);
-      return;
-    }
-
+    event.preventDefault(); setBusy(true); setError(null); setNotice(null);
     try {
       const created = await api.post<PropertyRow>("/properties", {
-        reference: form.reference.trim() || undefined,
         branchId: form.branchId || undefined,
-        name: form.name.trim(),
-        propertyType: form.propertyType,
-        ownerClientName: form.ownerClientName.trim(),
-        plotNumber,
-        titleNumber,
-        province: form.province.trim(),
-        district: form.district.trim(),
-        sector: form.sector.trim(),
-        cell: form.cell.trim(),
-        villageStreet: form.villageStreet.trim() || undefined,
+        name: form.name.trim(), propertyType: form.propertyType, ownerClientName: form.ownerClientName.trim(),
+        titleNumber: form.titleNumber.trim(), province: form.province.trim(), district: form.district.trim(),
+        sector: form.sector.trim(), cell: form.cell.trim(), villageStreet: form.villageStreet.trim() || undefined,
       });
-
-      setNotice(`Property ${created.reference} created successfully.`);
-      setShowCreate(false);
-      setForm({ ...EMPTY_PROPERTY_FORM, branchId: isInspector ? user?.branchId ?? "" : "" });
-      await load();
-    } catch (caught) {
-      setError(readableError(caught));
-    } finally {
-      setBusy(false);
-    }
+      setNotice(`Property ${created.reference} created successfully.`); setShowCreate(false); setForm({ ...EMPTY_PROPERTY_FORM, branchId: isInspector ? user?.branchId ?? "" : "" }); await load();
+    } catch (e) { setError(readableError(e)); } finally { setBusy(false); }
   };
 
   const raiseInspection = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!raiseFor) return;
-
-    setBusy(true);
-    setError(null);
-    setNotice(null);
-
+    event.preventDefault(); if (!raiseFor) return; setBusy(true); setError(null); setNotice(null);
     try {
-      await api.post("/inspections", {
-        propertyId: raiseFor.id,
-        loanReference: inspectionForm.loanReference.trim(),
-        clientName: inspectionForm.clientName.trim() || undefined,
-        inspectorId: can("inspections.assign") ? inspectionForm.inspectorId || undefined : undefined,
-        priority: inspectionForm.priority,
-        dueDate: inspectionForm.dueDate ? new Date(inspectionForm.dueDate).toISOString() : undefined,
-      });
-
-      setNotice(isInspector
-        ? `Inspection raised for ${raiseFor.reference} and assigned to you.`
-        : `Inspection raised for ${raiseFor.reference}.`);
-      setRaiseFor(null);
-      setInspectionForm({ ...EMPTY_INSPECTION_FORM });
-      await load();
-    } catch (caught) {
-      setError(readableError(caught));
-    } finally {
-      setBusy(false);
-    }
+      await api.post("/inspections", { propertyId: raiseFor.id, loanReference: inspectionForm.loanReference.trim(), clientName: inspectionForm.clientName.trim() || undefined, inspectorId: can("inspections.assign") ? inspectionForm.inspectorId || undefined : undefined, priority: inspectionForm.priority, dueDate: inspectionForm.dueDate ? new Date(inspectionForm.dueDate).toISOString() : undefined });
+      setNotice(isInspector ? `Inspection raised for ${raiseFor.reference} and assigned to you.` : `Inspection raised for ${raiseFor.reference}.`); setRaiseFor(null); setInspectionForm(EMPTY_INSPECTION_FORM); await load();
+    } catch (e) { setError(readableError(e)); } finally { setBusy(false); }
   };
 
-  const inspectorBranch = branches.find((branch) => branch.id === user?.branchId);
+  return <div className="space-y-6">
+    <PageHeader title="Properties" description={isInspector ? "Register collateral from the field and raise inspections." : "Collateral properties registered for inspection."} action={can("properties.write") ? <Button icon={<IconPlus className="h-4 w-4" />} onClick={() => setShowCreate(true)}>Create property</Button> : undefined} />
+    {error && <Alert tone="danger" title="Something went wrong" onDismiss={() => setError(null)}>{error}</Alert>}
+    {notice && <Alert tone="success" title={notice} onDismiss={() => setNotice(null)} />}
+    <Card className="p-4"><SearchInput placeholder="Search reference, owner, UPI or location" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search properties" /></Card>
+    <Card>{loading ? <TableSkeleton rows={6} columns={6} /> : !result || result.data.length === 0 ? <EmptyState icon={<IconHome />} title={debounced ? "No properties match that search" : "No properties yet"} description={debounced ? "Try another search." : "Create a property to begin an inspection."} action={can("properties.write") && !debounced ? <Button onClick={() => setShowCreate(true)}>Create property</Button> : undefined} /> : <><Table label="Registered properties"><thead><tr><Th>Property</Th><Th>Owner / Client</Th><Th>Location</Th><Th>UPI</Th><Th className="hidden lg:table-cell">Branch</Th><Th align="right">Inspections</Th><Th align="right">Actions</Th></tr></thead><tbody>{result.data.map((p) => <Tr key={p.id}><Td><span className="font-semibold text-ink">{p.reference}</span><span className="mt-0.5 block text-sm text-ink">{p.name || "Unnamed property"}</span><span className="mt-0.5 block text-xs text-ink-faint">{p.propertyType}</span></Td><Td>{p.ownerClientName || <span className="text-ink-faint">Not provided</span>}</Td><Td><span className="block max-w-[260px] truncate">{[p.district, p.sector, p.cell].filter(Boolean).join(", ") || "Location not provided"}</span>{p.province && <span className="mt-0.5 block text-xs text-ink-faint">{p.province}{p.villageStreet ? ` · ${p.villageStreet}` : ""}</span>}</Td><Td className="font-mono text-xs">{p.titleNumber || "—"}</Td><Td className="hidden text-sm text-ink-muted lg:table-cell">{p.branch.code}</Td><Td align="right" className="tabular-nums">{p._count.inspections}</Td><Td align="right">{can("inspections.create") && <Button size="sm" variant="secondary" onClick={() => setRaiseFor(p)}>Raise inspection</Button>}</Td></Tr>)}</tbody></Table><Pagination page={result.meta.page} totalPages={result.meta.totalPages} total={result.meta.total} onChange={setPage} /></>}</Card>
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Properties"
-        description={isInspector
-          ? "Create basic collateral information from the field and raise inspections for your assigned branch."
-          : "Basic collateral properties registered for inspection."}
-        action={can("properties.write") ? (
-          <Button icon={<IconPlus className="h-4 w-4" />} onClick={() => setShowCreate(true)}>
-            Create property
-          </Button>
-        ) : undefined}
-      />
+    <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Create property" description="UPI is the only land identifier. Property reference is generated automatically from the owner name and creation date." width="lg" footer={<><Button variant="secondary" onClick={() => setShowCreate(false)}>Cancel</Button><Button form="property-form" type="submit" loading={busy}>Create property</Button></>}>
+      <form id="property-form" onSubmit={createProperty} className="grid gap-4 sm:grid-cols-2">
+        {isInspector ? <Field label="Branch" hint="Your assigned branch is used automatically." required htmlFor="property-branch"><Input id="property-branch" value={inspectorBranch ? `${inspectorBranch.code} — ${inspectorBranch.name}` : "Your assigned branch"} readOnly disabled /></Field> : <Field label="Branch" required htmlFor="property-branch"><Select id="property-branch" required value={form.branchId} onChange={setPropertyField("branchId")}><option value="">Choose a branch</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.code} — {b.name}</option>)}</Select></Field>}
+        <Field label="Owner / client name" required htmlFor="property-owner"><Input id="property-owner" required value={form.ownerClientName} placeholder="John Doe" onChange={setPropertyField("ownerClientName")} /></Field>
+        <div className="sm:col-span-2"><Field label="Property name / description" required htmlFor="property-name"><Input id="property-name" required value={form.name} placeholder="Kigali Commercial Building" onChange={setPropertyField("name")} /></Field></div>
+        <Field label="Property type" required htmlFor="property-type"><Select id="property-type" required value={form.propertyType} onChange={setPropertyField("propertyType")}>{PROPERTY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</Select></Field>
+        <Field label="UPI" hint="Required unique parcel identifier." required htmlFor="property-upi"><Input id="property-upi" required value={form.titleNumber} placeholder="1/03/07/04/1234" onChange={setPropertyField("titleNumber")} /></Field>
+        <div className="sm:col-span-2 rounded-xl bg-surface-2 p-3 text-sm text-ink-muted"><strong className="text-ink">Property reference</strong> is generated automatically as <span className="font-mono">OWNER-YYYY-MM-DD</span>. It is not entered manually.</div>
+        <div className="sm:col-span-2 pt-2"><h3 className="text-sm font-semibold text-ink">Administrative location</h3><p className="mt-1 text-xs text-ink-muted">UPI does not determine the location. Enter these fields manually.</p></div>
+        <Field label="Province" required htmlFor="property-province"><Input id="property-province" required value={form.province} onChange={setPropertyField("province")} /></Field>
+        <Field label="District" required htmlFor="property-district"><Input id="property-district" required value={form.district} onChange={setPropertyField("district")} /></Field>
+        <Field label="Sector" required htmlFor="property-sector"><Input id="property-sector" required value={form.sector} onChange={setPropertyField("sector")} /></Field>
+        <Field label="Cell" required htmlFor="property-cell"><Input id="property-cell" required value={form.cell} onChange={setPropertyField("cell")} /></Field>
+        <div className="sm:col-span-2"><Field label="Village / Street" htmlFor="property-village"><Input id="property-village" value={form.villageStreet} onChange={setPropertyField("villageStreet")} /></Field></div>
+      </form>
+    </Modal>
 
-      {error && <Alert tone="danger" title="Something went wrong" onDismiss={() => setError(null)}>{error}</Alert>}
-      {notice && <Alert tone="success" title={notice} onDismiss={() => setNotice(null)} />}
-
-      <Card className="p-4">
-        <SearchInput
-          placeholder="Search reference, property name, owner or location"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          aria-label="Search properties"
-        />
-      </Card>
-
-      <Card>
-        {loading ? (
-          <TableSkeleton rows={6} columns={6} />
-        ) : !result || result.data.length === 0 ? (
-          <EmptyState
-            icon={<IconHome />}
-            title={debounced ? "No properties match that search" : "No properties yet"}
-            description={debounced ? "Try a different reference, name or location." : "Create one to begin raising inspections."}
-            action={can("properties.write") && !debounced ? (
-              <Button onClick={() => setShowCreate(true)}>Create property</Button>
-            ) : undefined}
-          />
-        ) : (
-          <>
-            <Table label="Registered properties">
-              <thead><tr>
-                <Th>Property</Th><Th>Owner / Client</Th><Th>Location</Th>
-                <Th className="hidden lg:table-cell">Branch</Th>
-                <Th align="right">Inspections</Th><Th align="right">Actions</Th>
-              </tr></thead>
-              <tbody>
-                {result.data.map((property) => (
-                  <Tr key={property.id}>
-                    <Td>
-                      <span className="font-semibold text-ink">{property.reference}</span>
-                      <span className="mt-0.5 block text-sm text-ink">{property.name || "Unnamed property"}</span>
-                      <span className="mt-0.5 block text-xs text-ink-faint">{property.propertyType}</span>
-                    </Td>
-                    <Td>{property.ownerClientName || <span className="text-ink-faint">Not provided</span>}</Td>
-                    <Td>
-                      <span className="block max-w-[300px] truncate">
-                        {[property.district, property.sector, property.cell].filter(Boolean).join(", ") || "Location not provided"}
-                      </span>
-                      {property.province && <span className="mt-0.5 block text-xs text-ink-faint">{property.province}{property.villageStreet ? ` · ${property.villageStreet}` : ""}</span>}
-                    </Td>
-                    <Td className="hidden text-sm text-ink-muted lg:table-cell">{property.branch.code}</Td>
-                    <Td align="right" className="tabular-nums">{property._count.inspections}</Td>
-                    <Td align="right">{can("inspections.create") && <Button size="sm" variant="secondary" onClick={() => setRaiseFor(property)}>Raise inspection</Button>}</Td>
-                  </Tr>
-                ))}
-              </tbody>
-            </Table>
-            <Pagination page={result.meta.page} totalPages={result.meta.totalPages} total={result.meta.total} onChange={setPage} />
-          </>
-        )}
-      </Card>
-
-      <Modal
-        open={showCreate}
-        onClose={closeCreate}
-        title="Create property"
-        description="Enter the basic property information. Plot number and UPI are required for every property."
-        width="lg"
-        footer={<><Button variant="secondary" onClick={closeCreate}>Cancel</Button><Button form="property-form" type="submit" loading={busy}>Create property</Button></>}
-      >
-        <form id="property-form" onSubmit={createProperty} className="grid gap-4 sm:grid-cols-2">
-          <Field label="Property reference" hint="Leave blank to generate automatically." htmlFor="property-reference">
-            <Input id="property-reference" name="reference" value={form.reference} placeholder="PROP-2026-0001" onChange={setPropertyField("reference")} />
-          </Field>
-
-          {isInspector ? (
-            <Field label="Branch" hint="Your assigned branch is used automatically." required htmlFor="property-branch">
-              <Input id="property-branch" name="branchId" value={inspectorBranch ? `${inspectorBranch.code} — ${inspectorBranch.name}` : "Your assigned branch"} readOnly disabled />
-            </Field>
-          ) : (
-            <Field label="Branch" required htmlFor="property-branch">
-              <Select id="property-branch" name="branchId" required value={form.branchId} onChange={setPropertyField("branchId")}>
-                <option value="">Choose a branch</option>
-                {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.code} — {branch.name}</option>)}
-              </Select>
-            </Field>
-          )}
-
-          <div className="sm:col-span-2">
-            <Field label="Property name / description" required htmlFor="property-name">
-              <Input id="property-name" name="name" required value={form.name} placeholder="Kigali Commercial Building" onChange={setPropertyField("name")} />
-            </Field>
-          </div>
-
-          <Field label="Property type" required htmlFor="property-type">
-            <Select id="property-type" name="propertyType" required value={form.propertyType} onChange={setPropertyField("propertyType")}>
-              {PROPERTY_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
-            </Select>
-          </Field>
-
-          <Field label="Owner / client name" required htmlFor="property-owner">
-            <Input id="property-owner" name="ownerClientName" required value={form.ownerClientName} placeholder="John Doe" onChange={setPropertyField("ownerClientName")} />
-          </Field>
-
-          <div className="sm:col-span-2 pt-2">
-            <h3 className="text-sm font-semibold text-ink">Land registration</h3>
-            <p className="mt-1 text-xs text-ink-muted">Plot number and UPI are required for every property.</p>
-          </div>
-
-          <Field label="Plot number" hint="Required." required htmlFor="property-plot-number">
-            <Input id="property-plot-number" name="plotNumber" required value={form.plotNumber} placeholder="1234" onChange={setPropertyField("plotNumber")} />
-          </Field>
-
-          <Field label="UPI" hint="Required land title reference." required htmlFor="property-upi">
-            <Input id="property-upi" name="titleNumber" required value={form.titleNumber} placeholder="1/03/07/04/1234" onChange={setPropertyField("titleNumber")} />
-          </Field>
-
-          <div className="sm:col-span-2 pt-2">
-            <h3 className="text-sm font-semibold text-ink">Location</h3>
-            <p className="mt-1 text-xs text-ink-muted">Enter the basic administrative location of the property.</p>
-          </div>
-
-          <Field label="Province" required htmlFor="property-province"><Input id="property-province" name="province" required value={form.province} placeholder="Kigali" onChange={setPropertyField("province")} /></Field>
-          <Field label="District" required htmlFor="property-district"><Input id="property-district" name="district" required value={form.district} placeholder="Gasabo" onChange={setPropertyField("district")} /></Field>
-          <Field label="Sector" required htmlFor="property-sector"><Input id="property-sector" name="sector" required value={form.sector} placeholder="Kimironko" onChange={setPropertyField("sector")} /></Field>
-          <Field label="Cell" required htmlFor="property-cell"><Input id="property-cell" name="cell" required value={form.cell} placeholder="Nyagatovu" onChange={setPropertyField("cell")} /></Field>
-          <div className="sm:col-span-2">
-            <Field label="Village / Street" hint="Optional where applicable." htmlFor="property-village-street">
-              <Input id="property-village-street" name="villageStreet" value={form.villageStreet} placeholder="KG 11 Ave" onChange={setPropertyField("villageStreet")} />
-            </Field>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal
-        open={raiseFor !== null}
-        onClose={closeRaise}
-        title="Raise inspection"
-        description={raiseFor ? `${raiseFor.reference} — ${raiseFor.name || "Property"}` : undefined}
-        footer={<><Button variant="secondary" onClick={closeRaise}>Cancel</Button><Button form="inspection-form" type="submit" loading={busy}>Raise inspection</Button></>}
-      >
-        <form id="inspection-form" onSubmit={raiseInspection} className="space-y-4">
-          <Field label="Loan reference" required htmlFor="inspection-loan"><Input id="inspection-loan" name="loanReference" required value={inspectionForm.loanReference} placeholder="LOAN-2026-001" onChange={setInspectionField("loanReference")} /></Field>
-          <Field label="Client name" htmlFor="inspection-client"><Input id="inspection-client" name="clientName" value={inspectionForm.clientName} onChange={setInspectionField("clientName")} /></Field>
-
-          {can("inspections.assign") ? (
-            <Field label="Assign to inspector" hint="Can be assigned later if left blank." htmlFor="inspection-inspector">
-              <Select id="inspection-inspector" name="inspectorId" value={inspectionForm.inspectorId} onChange={setInspectionField("inspectorId")}>
-                <option value="">{inspectors.length > 0 ? "Assign later" : "Loading inspectors…"}</option>
-                {inspectors.map((inspector) => <option key={inspector.id} value={inspector.id}>{inspector.firstName} {inspector.lastName}</option>)}
-              </Select>
-            </Field>
-          ) : isInspector ? (
-            <Field label="Inspector" hint="This inspection will be assigned to you automatically." htmlFor="inspection-inspector">
-              <Input id="inspection-inspector" value={`${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim()} readOnly disabled />
-            </Field>
-          ) : null}
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Priority" htmlFor="inspection-priority"><Select id="inspection-priority" name="priority" value={inspectionForm.priority} onChange={setInspectionField("priority")}><option value="LOW">Low</option><option value="NORMAL">Normal</option><option value="HIGH">High</option><option value="URGENT">Urgent</option></Select></Field>
-            <Field label="Due date" htmlFor="inspection-due"><Input id="inspection-due" name="dueDate" type="date" value={inspectionForm.dueDate} onChange={setInspectionField("dueDate")} /></Field>
-          </div>
-        </form>
-      </Modal>
-    </div>
-  );
+    <Modal open={Boolean(raiseFor)} onClose={() => setRaiseFor(null)} title="Raise inspection" description={raiseFor ? `${raiseFor.reference} · ${raiseFor.name || "Property"}` : ""} footer={<><Button variant="secondary" onClick={() => setRaiseFor(null)}>Cancel</Button><Button form="inspection-form" type="submit" loading={busy}>Raise inspection</Button></>}>
+      <form id="inspection-form" onSubmit={raiseInspection} className="space-y-4"><Field label="Loan reference" required htmlFor="loan-reference"><Input id="loan-reference" required value={inspectionForm.loanReference} onChange={setInspectionField("loanReference")} /></Field><Field label="Client name" htmlFor="client-name"><Input id="client-name" value={inspectionForm.clientName} onChange={setInspectionField("clientName")} /></Field>{can("inspections.assign") && <Field label="Inspector" htmlFor="inspector"><Select id="inspector" value={inspectionForm.inspectorId} onChange={setInspectionField("inspectorId")}><option value="">Unassigned</option>{inspectors.map((i) => <option key={i.id} value={i.id}>{i.firstName} {i.lastName}</option>)}</Select></Field>}</form>
+    </Modal>
+  </div>;
 }
