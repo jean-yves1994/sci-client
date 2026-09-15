@@ -7,10 +7,11 @@ import { formatDateTime, formatMoney, fullName, humanise } from '@/lib/format';
 
 interface Adjustment { id: string; fieldCode: string; originalValue: unknown; adjustedValue: Record<string, unknown>; reason: string; createdAt: string; reviewerFirstName?: string; reviewerLastName?: string; }
 interface ReviewerValuation { id: string; inspectionId: string; reviewerId: string; currency: string; marketValue: string | number | null; forcedSaleValue: string | number | null; replacementCost: string | number | null; rentalEstimate: string | number | null; comments: string | null; createdAt: string; updatedAt: string; }
-interface ReviewWorkspace { inspection: InspectionDetail & { reviewerRisk?: { level: string; comments?: string | null } | null; reviewerConclusion?: string | null; reviewerAdjustedAt?: string | null }; reviewerValuation: ReviewerValuation | null; adjustments: Adjustment[]; }
+interface ReviewWorkspace { inspection: Partial<InspectionDetail> & { reviewerRisk?: { level: string; comments?: string | null } | null; reviewerConclusion?: string | null; reviewerAdjustedAt?: string | null }; reviewerValuation: ReviewerValuation | null; adjustments: Adjustment[]; }
+type ReviewInspection = InspectionDetail & { reviewerRisk?: { level: string; comments?: string | null } | null; reviewerConclusion?: string | null; reviewerAdjustedAt?: string | null };
 
 export function ProfessionalReviewPanel({ inspectionId }: { inspectionId: string }) {
-  const [data, setData] = React.useState<ReviewWorkspace | null>(null);
+  const [data, setData] = React.useState<ReviewWorkspace & { inspection: ReviewInspection } | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
@@ -24,7 +25,23 @@ export function ProfessionalReviewPanel({ inspectionId }: { inspectionId: string
 
   const load = React.useCallback(async () => {
     try {
-      const result = await api.get<ReviewWorkspace>(`/inspections/${inspectionId}/review`);
+      setError(null);
+      // The review endpoint is intentionally focused on review-only data and
+      // does not guarantee the full inspection-detail projection (notably
+      // completeness and the inspector/reviewer references). Load both
+      // projections and merge them so the edit page remains stable even while
+      // the backend is deployed independently.
+      const [review, detail] = await Promise.all([
+        api.get<ReviewWorkspace>(`/inspections/${inspectionId}/review`),
+        api.get<InspectionDetail>(`/inspections/${inspectionId}`),
+      ]);
+      const inspection = {
+        ...detail,
+        reviewerRisk: review.inspection.reviewerRisk ?? null,
+        reviewerConclusion: review.inspection.reviewerConclusion ?? null,
+        reviewerAdjustedAt: review.inspection.reviewerAdjustedAt ?? null,
+      } as ReviewInspection;
+      const result = { ...review, inspection };
       setData(result);
       const currentRisk = result.inspection.reviewerRisk;
       if (currentRisk) { setRisk(currentRisk.level); setRiskComments(currentRisk.comments ?? ''); }
@@ -161,10 +178,10 @@ export function ProfessionalReviewPanel({ inspectionId }: { inspectionId: string
 
     <Card>
       <CardHeader title="Review history" description="Corrections, comments and status changes remain available as the audit trail." />
-      <div className="space-y-2 px-5 pb-5">{inspection.statusEvents.map(e => <div key={e.id} className="flex gap-3 border-l-2 border-line pl-3 text-sm"><div><p className="font-medium text-ink">{humanise(e.toStatus)}</p><p className="text-2xs text-ink-faint">{formatDateTime(e.createdAt)} · {fullName(e.actor)}</p>{e.comment && <p className="mt-1 text-ink-muted">{e.comment}</p>}</div></div>)}</div>
+      <div className="space-y-2 px-5 pb-5">{(inspection.statusEvents ?? []).map(e => <div key={e.id} className="flex gap-3 border-l-2 border-line pl-3 text-sm"><div><p className="font-medium text-ink">{humanise(e.toStatus)}</p><p className="text-ink-muted">{formatDateTime(e.createdAt)}{e.comment ? ` · ${e.comment}` : ''}</p></div></div>)}</div>
     </Card>
   </div>;
 }
 
-function ReviewFact({ label, value }: { label: string; value: string }) { return <div className="rounded-xl bg-surface-2 p-3"><p className="text-2xs uppercase tracking-wide text-ink-faint">{label}</p><p className="mt-1 text-sm font-semibold text-ink">{value || '—'}</p></div>; }
-function Check({ label, ok, detail }: { label: string; ok: boolean; detail: string }) { return <div className="flex items-center justify-between rounded-xl bg-surface-2 px-3 py-2.5"><div><p className="text-sm font-medium text-ink">{label}</p><p className="text-2xs text-ink-faint">{detail}</p></div><Badge tone={ok ? 'success' : 'warning'}>{ok ? 'Verified' : 'Attention'}</Badge></div>; }
+function ReviewFact({ label, value }: { label: string; value: string }) { return <div><p className="text-2xs uppercase tracking-wide text-ink-faint">{label}</p><p className="mt-1 text-sm font-medium text-ink">{value}</p></div>; }
+function Check({ label, ok, detail }: { label: string; ok: boolean; detail: string }) { return <div className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2.5"><div><p className="text-sm font-medium text-ink">{label}</p><p className="text-2xs text-ink-faint">{detail}</p></div><Badge tone={ok ? 'success' : 'warning'}>{ok ? 'OK' : 'Review'}</Badge></div>; }
