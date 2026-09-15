@@ -6,7 +6,7 @@ import { ApiError, InspectionDetail, api, readableError } from '@/lib/api';
 import { formatDateTime, formatMoney, fullName, humanise } from '@/lib/format';
 
 interface Adjustment { id: string; fieldCode: string; originalValue: unknown; adjustedValue: Record<string, unknown>; reason: string; createdAt: string; reviewerFirstName?: string; reviewerLastName?: string; }
-interface ReviewerValuation { id: string; inspectionId: string; reviewerId: string; currency: string; marketValue: unknown; forcedSaleValue: unknown; replacementCost: unknown; rentalEstimate: unknown; comments: string | null; createdAt: string; updatedAt: string; }
+interface ReviewerValuation { id: string; inspectionId: string; reviewerId: string; currency: string; marketValue: string | number | null; forcedSaleValue: string | number | null; replacementCost: string | number | null; rentalEstimate: string | number | null; comments: string | null; createdAt: string; updatedAt: string; }
 interface ReviewWorkspace { inspection: InspectionDetail & { reviewerRisk?: { level: string; comments?: string | null } | null; reviewerConclusion?: string | null; reviewerAdjustedAt?: string | null }; reviewerValuation: ReviewerValuation | null; adjustments: Adjustment[]; }
 
 export function ProfessionalReviewPanel({ inspectionId }: { inspectionId: string }) {
