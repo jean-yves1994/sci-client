@@ -6,7 +6,8 @@ import { ApiError, InspectionDetail, api, readableError } from '@/lib/api';
 import { formatDateTime, formatMoney, fullName, humanise } from '@/lib/format';
 
 interface Adjustment { id: string; fieldCode: string; originalValue: unknown; adjustedValue: Record<string, unknown>; reason: string; createdAt: string; reviewerFirstName?: string; reviewerLastName?: string; }
-interface ReviewWorkspace { inspection: InspectionDetail & { reviewerRisk?: { level: string; comments?: string | null } | null; reviewerConclusion?: string | null }; adjustments: Adjustment[]; }
+interface ReviewerValuation { id: string; inspectionId: string; reviewerId: string; currency: string; marketValue: unknown; forcedSaleValue: unknown; replacementCost: unknown; rentalEstimate: unknown; comments: string | null; createdAt: string; updatedAt: string; }
+interface ReviewWorkspace { inspection: InspectionDetail & { reviewerRisk?: { level: string; comments?: string | null } | null; reviewerConclusion?: string | null; reviewerAdjustedAt?: string | null }; reviewerValuation: ReviewerValuation | null; adjustments: Adjustment[]; }
 
 export function ProfessionalReviewPanel({ inspectionId }: { inspectionId: string }) {
   const [data, setData] = React.useState<ReviewWorkspace | null>(null);
@@ -28,15 +29,19 @@ export function ProfessionalReviewPanel({ inspectionId }: { inspectionId: string
       const currentRisk = result.inspection.reviewerRisk;
       if (currentRisk) { setRisk(currentRisk.level); setRiskComments(currentRisk.comments ?? ''); }
       setConclusion(result.inspection.reviewerConclusion ?? '');
-      const v = result.inspection.valuation;
-      if (v) setValuation({
-        currency: v.currency ?? 'RWF',
-        marketValue: v.marketValue != null ? String(v.marketValue) : '',
-        forcedSaleValue: v.forcedSaleValue != null ? String(v.forcedSaleValue) : '',
-        replacementCost: v.replacementCost != null ? String(v.replacementCost) : '',
-        rentalEstimate: v.rentalEstimate != null ? String(v.rentalEstimate) : '',
-        comments: v.comments ?? '',
-      });
+      const v = result.reviewerValuation;
+      if (v) {
+        setValuation({
+          currency: v.currency ?? 'RWF',
+          marketValue: v.marketValue != null ? String(v.marketValue) : '',
+          forcedSaleValue: v.forcedSaleValue != null ? String(v.forcedSaleValue) : '',
+          replacementCost: v.replacementCost != null ? String(v.replacementCost) : '',
+          rentalEstimate: v.rentalEstimate != null ? String(v.rentalEstimate) : '',
+          comments: v.comments ?? '',
+        });
+      } else {
+        setValuation({ currency: 'RWF', marketValue: '', forcedSaleValue: '', replacementCost: '', rentalEstimate: '', comments: '' });
+      }
     } catch (e) { setError(readableError(e)); }
   }, [inspectionId]);
   React.useEffect(() => { void load(); }, [load]);
@@ -54,13 +59,14 @@ export function ProfessionalReviewPanel({ inspectionId }: { inspectionId: string
   const inspection = data.inspection;
   const version = inspection.version;
   const editable = ['SUBMITTED', 'RESUBMITTED', 'UNDER_REVIEW'].includes(inspection.status) && Boolean(inspection.reviewer);
+  const inspectorValuation = inspection.valuation;
 
   return <div className="space-y-4">
     {error && <Alert title="Review action failed" onDismiss={() => setError(null)}>{error}</Alert>}
     {notice && <Alert tone="success" title={notice} onDismiss={() => setNotice(null)} />}
 
     <Card>
-      <CardHeader title="Professional Review & Quality Assurance" description="Original inspector data remains intact. Reviewer changes are recorded separately with a reason and timestamp." />
+      <CardHeader title="Professional Review & Quality Assurance" description="Inspector-submitted information is preserved. Professional review values, adjustments, risk and conclusions are stored separately with an audit trail." />
       <div className="grid gap-3 px-5 pb-5 sm:grid-cols-3">
         <ReviewFact label="Inspector" value={fullName(inspection.inspector)} />
         <ReviewFact label="Submitted" value={formatDateTime(inspection.submittedAt)} />
@@ -76,7 +82,8 @@ export function ProfessionalReviewPanel({ inspectionId }: { inspectionId: string
           <Check label="GPS / location" ok={inspection.locations.length > 0} detail={inspection.locations.length ? `${inspection.locations[0].accuracyM ?? '—'} m accuracy` : 'No capture'} />
           <Check label="Evidence" ok={inspection.photos.length > 0} detail={`${inspection.photos.length} photo(s)`} />
           <Check label="Owner / client" ok={Boolean(inspection.owner)} detail={inspection.owner?.fullName ?? 'Not recorded'} />
-          <Check label="Valuation" ok={Boolean(inspection.valuation)} detail={inspection.valuation ? formatMoney(inspection.valuation.marketValue) : 'Not recorded'} />
+          <Check label="Inspector valuation" ok={Boolean(inspectorValuation)} detail={inspectorValuation ? formatMoney(inspectorValuation.marketValue) : 'Not recorded'} />
+          <Check label="Professional valuation" ok={Boolean(data.reviewerValuation)} detail={data.reviewerValuation ? formatMoney(data.reviewerValuation.marketValue) : 'Not yet entered'} />
         </div>
       </Card>
 
@@ -91,25 +98,48 @@ export function ProfessionalReviewPanel({ inspectionId }: { inspectionId: string
     </div>
 
     <Card>
-      <CardHeader title="Professional valuation" description="Enter or revise the professional valuation used for the review and final report. Valuation comments explain the basis, assumptions or material considerations behind the figures." />
-      <div className="grid gap-3 px-5 pb-5 sm:grid-cols-2 lg:grid-cols-4">
-        <Field label="Currency"><input value={valuation.currency} disabled={!editable || busy} onChange={e => setValuation(v => ({ ...v, currency: e.target.value.toUpperCase() }))} maxLength={3} className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm" /></Field>
-        <Field label="Market value"><input type="number" min="0" value={valuation.marketValue} disabled={!editable || busy} onChange={e => setValuation(v => ({ ...v, marketValue: e.target.value }))} placeholder="0" className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm" /></Field>
-        <Field label="Forced sale value"><input type="number" min="0" value={valuation.forcedSaleValue} disabled={!editable || busy} onChange={e => setValuation(v => ({ ...v, forcedSaleValue: e.target.value }))} placeholder="0" className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm" /></Field>
-        <Field label="Replacement cost"><input type="number" min="0" value={valuation.replacementCost} disabled={!editable || busy} onChange={e => setValuation(v => ({ ...v, replacementCost: e.target.value }))} placeholder="0" className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm" /></Field>
-      </div>
-      <div className="space-y-3 px-5 pb-5">
-        <Field label="Rental estimate"><input type="number" min="0" value={valuation.rentalEstimate} disabled={!editable || busy} onChange={e => setValuation(v => ({ ...v, rentalEstimate: e.target.value }))} placeholder="0" className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm" /></Field>
-        <Field label="Valuation comments"><textarea value={valuation.comments} disabled={!editable || busy} onChange={e => setValuation(v => ({ ...v, comments: e.target.value }))} placeholder="Explain the valuation basis, assumptions, market evidence, adjustments or other professional considerations…" className="min-h-28 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink-faint focus:border-primary focus:ring-2 focus:ring-primary/10" /></Field>
-        <Button loading={busy} disabled={!editable || !valuation.marketValue.trim()} onClick={() => void run(() => api.patch(`/inspections/${inspectionId}/review/valuation`, {
-          currency: valuation.currency.trim() || 'RWF',
-          marketValue: Number(valuation.marketValue),
-          forcedSaleValue: valuation.forcedSaleValue.trim() ? Number(valuation.forcedSaleValue) : undefined,
-          replacementCost: valuation.replacementCost.trim() ? Number(valuation.replacementCost) : undefined,
-          rentalEstimate: valuation.rentalEstimate.trim() ? Number(valuation.rentalEstimate) : undefined,
-          comments: valuation.comments,
-          baseVersion: version,
-        }), 'Professional valuation saved.')}>Save valuation</Button>
+      <CardHeader title="Valuation review" description="The inspector's submitted valuation is read-only. The professional reviewer enters a separate valuation that is used for the report after review." />
+      <div className="grid gap-4 lg:grid-cols-2 px-5 pb-5">
+        <div className="rounded-2xl border border-line bg-surface-2 p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div><h3 className="text-sm font-semibold text-ink">Inspector valuation</h3><p className="text-2xs text-ink-faint">Submitted inspection data · read-only</p></div>
+            <Badge tone="neutral">Original</Badge>
+          </div>
+          {inspectorValuation ? <div className="grid grid-cols-2 gap-3 text-sm">
+            <ReviewFact label="Currency" value={inspectorValuation.currency || 'RWF'} />
+            <ReviewFact label="Market value" value={formatMoney(inspectorValuation.marketValue)} />
+            <ReviewFact label="Forced sale" value={formatMoney(inspectorValuation.forcedSaleValue)} />
+            <ReviewFact label="Replacement cost" value={formatMoney(inspectorValuation.replacementCost)} />
+            <ReviewFact label="Rental estimate" value={formatMoney(inspectorValuation.rentalEstimate)} />
+            <div className="col-span-2 rounded-xl bg-surface p-3"><p className="text-2xs uppercase tracking-wide text-ink-faint">Inspector comments</p><p className="mt-1 whitespace-pre-wrap text-sm text-ink">{inspectorValuation.comments || '—'}</p></div>
+          </div> : <p className="text-sm text-ink-muted">The inspector did not submit a valuation.</p>}
+        </div>
+
+        <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div><h3 className="text-sm font-semibold text-ink">Professional valuation</h3><p className="text-2xs text-ink-faint">Reviewer assessment · editable</p></div>
+            <Badge tone={data.reviewerValuation ? 'success' : 'warning'}>{data.reviewerValuation ? 'Saved' : 'Not entered'}</Badge>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Currency"><input value={valuation.currency} disabled={!editable || busy} onChange={e => setValuation(v => ({ ...v, currency: e.target.value.toUpperCase() }))} maxLength={3} className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm" /></Field>
+            <Field label="Market value"><input type="number" min="0" value={valuation.marketValue} disabled={!editable || busy} onChange={e => setValuation(v => ({ ...v, marketValue: e.target.value }))} placeholder="0" className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm" /></Field>
+            <Field label="Forced sale value"><input type="number" min="0" value={valuation.forcedSaleValue} disabled={!editable || busy} onChange={e => setValuation(v => ({ ...v, forcedSaleValue: e.target.value }))} placeholder="0" className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm" /></Field>
+            <Field label="Replacement cost"><input type="number" min="0" value={valuation.replacementCost} disabled={!editable || busy} onChange={e => setValuation(v => ({ ...v, replacementCost: e.target.value }))} placeholder="0" className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm" /></Field>
+            <Field label="Rental estimate"><input type="number" min="0" value={valuation.rentalEstimate} disabled={!editable || busy} onChange={e => setValuation(v => ({ ...v, rentalEstimate: e.target.value }))} placeholder="0" className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm" /></Field>
+          </div>
+          <div className="mt-3 space-y-3">
+            <Field label="Professional valuation comments"><textarea value={valuation.comments} disabled={!editable || busy} onChange={e => setValuation(v => ({ ...v, comments: e.target.value }))} placeholder="Explain the valuation basis, assumptions, market evidence, adjustments or other professional considerations…" className="min-h-28 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink-faint focus:border-primary focus:ring-2 focus:ring-primary/10" /></Field>
+            <div className="flex flex-wrap items-center gap-3"><Button loading={busy} disabled={!editable || !valuation.marketValue.trim()} onClick={() => void run(() => api.patch(`/inspections/${inspectionId}/review/valuation`, {
+              currency: valuation.currency.trim() || 'RWF',
+              marketValue: Number(valuation.marketValue),
+              forcedSaleValue: valuation.forcedSaleValue.trim() ? Number(valuation.forcedSaleValue) : undefined,
+              replacementCost: valuation.replacementCost.trim() ? Number(valuation.replacementCost) : undefined,
+              rentalEstimate: valuation.rentalEstimate.trim() ? Number(valuation.rentalEstimate) : undefined,
+              comments: valuation.comments,
+              baseVersion: version,
+            }), 'Professional valuation saved.')}>Save professional valuation</Button>{data.reviewerValuation && <span className="text-2xs text-ink-faint">Last updated {formatDateTime(data.reviewerValuation.updatedAt)}</span>}</div>
+          </div>
+        </div>
       </div>
     </Card>
 
