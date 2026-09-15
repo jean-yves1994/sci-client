@@ -32,8 +32,6 @@ export default function ReviewQueuePage() {
       .finally(() => setLoading(false));
   }, [page]);
 
-  // Oldest submission first is the server's ordering, so the top of the list is
-  // the item that has been waiting longest.
   const oldest = result?.data[0];
 
   return (
@@ -74,7 +72,7 @@ export default function ReviewQueuePage() {
 
       <Card>
         {loading ? (
-          <TableSkeleton rows={7} columns={6} />
+          <TableSkeleton rows={7} columns={7} />
         ) : !result || result.data.length === 0 ? (
           <EmptyState
             icon={<IconCheckCircle />}
@@ -93,63 +91,76 @@ export default function ReviewQueuePage() {
                   <Th>Waiting</Th>
                   <Th className="hidden sm:table-cell">Priority</Th>
                   <Th>Status</Th>
+                  <Th align="right">Action</Th>
                 </tr>
               </thead>
               <tbody>
-                {result.data.map((item) => (
-                  <Tr key={item.id}>
-                    <Td>
-                      <Link
-                        href={`/inspections/${item.id}`}
-                        className="font-semibold text-ink transition-colors hover:text-brand-600"
-                      >
-                        {item.inspectionNumber}
-                      </Link>
-                      <span className="mt-0.5 block text-xs text-ink-faint">
-                        {item.loanReference}
-                      </span>
-                    </Td>
-                    <Td>
-                      <span className="font-medium">{item.property.reference}</span>
-                      <span className="mt-0.5 block max-w-[220px] truncate text-xs text-ink-faint">
-                        {item.property.addressLine}
-                      </span>
-                    </Td>
-                    <Td className="hidden text-sm text-ink-muted lg:table-cell">
-                      {item.branch.code}
-                    </Td>
-                    <Td className="hidden md:table-cell">
-                      {item.inspector ? (
-                        <span className="flex items-center gap-2">
-                          <Avatar
-                            size="sm"
-                            name={initials(item.inspector)}
-                            tone={avatarTone(item.inspector.id)}
-                          />
-                          <span className="text-sm">{fullName(item.inspector)}</span>
+                {result.data.map((item) => {
+                  const assignedToCurrentReviewer = Boolean(item.reviewer);
+                  return (
+                    <Tr key={item.id}>
+                      <Td>
+                        <Link
+                          href={`/inspections/${item.id}`}
+                          className="font-semibold text-ink transition-colors hover:text-brand-600"
+                        >
+                          {item.inspectionNumber}
+                        </Link>
+                        <span className="mt-0.5 block text-xs text-ink-faint">
+                          {item.loanReference}
                         </span>
-                      ) : (
-                        <span className="text-sm text-ink-faint">—</span>
-                      )}
-                    </Td>
-                    <Td className="whitespace-nowrap">
-                      <span className="text-sm font-medium text-ink">
-                        {item.submittedAt ? timeAgo(item.submittedAt) : '—'}
-                      </span>
-                      <span className="mt-0.5 block text-xs text-ink-faint">
-                        {formatDateTime(item.submittedAt)}
-                      </span>
-                    </Td>
-                    <Td className="hidden sm:table-cell">
-                      <Badge tone={priorityTone(item.priority)}>{humanise(item.priority)}</Badge>
-                    </Td>
-                    <Td>
-                      <StatusBadge tone={statusTone(item.status)}>
-                        {statusLabel(item.status)}
-                      </StatusBadge>
-                    </Td>
-                  </Tr>
-                ))}
+                      </Td>
+                      <Td>
+                        <span className="font-medium">{item.property.reference}</span>
+                        <span className="mt-0.5 block max-w-[220px] truncate text-xs text-ink-faint">
+                          {item.property.addressLine}
+                        </span>
+                      </Td>
+                      <Td className="hidden text-sm text-ink-muted lg:table-cell">
+                        {item.branch.code}
+                      </Td>
+                      <Td className="hidden md:table-cell">
+                        {item.inspector ? (
+                          <span className="flex items-center gap-2">
+                            <Avatar
+                              size="sm"
+                              name={initials(item.inspector)}
+                              tone={avatarTone(item.inspector.id)}
+                            />
+                            <span className="text-sm">{fullName(item.inspector)}</span>
+                          </span>
+                        ) : (
+                          <span className="text-sm text-ink-faint">—</span>
+                        )}
+                      </Td>
+                      <Td className="whitespace-nowrap">
+                        <span className="text-sm font-medium text-ink">
+                          {item.submittedAt ? timeAgo(item.submittedAt) : '—'}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-ink-faint">
+                          {formatDateTime(item.submittedAt)}
+                        </span>
+                      </Td>
+                      <Td className="hidden sm:table-cell">
+                        <Badge tone={priorityTone(item.priority)}>{humanise(item.priority)}</Badge>
+                      </Td>
+                      <Td>
+                        <StatusBadge tone={statusTone(item.status)}>
+                          {statusLabel(item.status)}
+                        </StatusBadge>
+                      </Td>
+                      <Td align="right">
+                        <Link
+                          href={`/inspections/${item.id}/review`}
+                          className="inline-flex items-center justify-center whitespace-nowrap rounded-xl bg-brand-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+                          aria-label={`${assignedToCurrentReviewer ? 'Edit' : 'Open'} ${item.inspectionNumber} review`}
+                        >
+                          {assignedToCurrentReviewer ? 'Edit inspection' : 'Open review'}
+                        </Link>
+                      </Td>
+                    </Tr>
+                  );
+                })}
               </tbody>
             </Table>
             <Pagination
