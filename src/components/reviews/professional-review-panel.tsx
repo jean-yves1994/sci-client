@@ -19,6 +19,7 @@ export function ProfessionalReviewPanel({ inspectionId }: { inspectionId: string
   const [risk, setRisk] = React.useState('LOW');
   const [riskComments, setRiskComments] = React.useState('');
   const [conclusion, setConclusion] = React.useState('');
+  const [valuation, setValuation] = React.useState({ currency: 'RWF', marketValue: '', forcedSaleValue: '', replacementCost: '', rentalEstimate: '', comments: '' });
 
   const load = React.useCallback(async () => {
     try {
@@ -27,6 +28,15 @@ export function ProfessionalReviewPanel({ inspectionId }: { inspectionId: string
       const currentRisk = result.inspection.reviewerRisk;
       if (currentRisk) { setRisk(currentRisk.level); setRiskComments(currentRisk.comments ?? ''); }
       setConclusion(result.inspection.reviewerConclusion ?? '');
+      const v = result.inspection.valuation;
+      if (v) setValuation({
+        currency: v.currency ?? 'RWF',
+        marketValue: v.marketValue != null ? String(v.marketValue) : '',
+        forcedSaleValue: v.forcedSaleValue != null ? String(v.forcedSaleValue) : '',
+        replacementCost: v.replacementCost != null ? String(v.replacementCost) : '',
+        rentalEstimate: v.rentalEstimate != null ? String(v.rentalEstimate) : '',
+        comments: v.comments ?? '',
+      });
     } catch (e) { setError(readableError(e)); }
   }, [inspectionId]);
   React.useEffect(() => { void load(); }, [load]);
@@ -43,7 +53,7 @@ export function ProfessionalReviewPanel({ inspectionId }: { inspectionId: string
   if (!data) return error ? <Alert title="Professional review unavailable">{error}</Alert> : <Card><div className="p-5 text-sm text-ink-muted">Loading professional review…</div></Card>;
   const inspection = data.inspection;
   const version = inspection.version;
-  const editable = ['SUBMITTED', 'RESUBMITTED', 'UNDER_REVIEW'].includes(inspection.status);
+  const editable = ['SUBMITTED', 'RESUBMITTED', 'UNDER_REVIEW'].includes(inspection.status) && Boolean(inspection.reviewer);
 
   return <div className="space-y-4">
     {error && <Alert title="Review action failed" onDismiss={() => setError(null)}>{error}</Alert>}
@@ -75,10 +85,33 @@ export function ProfessionalReviewPanel({ inspectionId }: { inspectionId: string
         <div className="space-y-3 px-5 pb-5">
           <Field label="Risk level"><select value={risk} disabled={!editable || busy} onChange={e => setRisk(e.target.value)} className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink"><option>LOW</option><option>MEDIUM</option><option>HIGH</option></select></Field>
           <Field label="Risk comments"><textarea value={riskComments} disabled={!editable || busy} onChange={e => setRiskComments(e.target.value)} placeholder="Explain material risks, inconsistencies or concerns…" className="min-h-28 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink-faint focus:border-primary focus:ring-2 focus:ring-primary/10" /></Field>
-          <Button loading={busy} disabled={!editable || !inspection.reviewer} onClick={() => void run(() => api.patch(`/inspections/${inspectionId}/review/risk`, { level: risk, comments: riskComments, baseVersion: version }), 'Risk assessment saved.')}>Save risk</Button>
+          <Button loading={busy} disabled={!editable} onClick={() => void run(() => api.patch(`/inspections/${inspectionId}/review/risk`, { level: risk, comments: riskComments, baseVersion: version }), 'Risk assessment saved.')}>Save risk</Button>
         </div>
       </Card>
     </div>
+
+    <Card>
+      <CardHeader title="Professional valuation" description="Enter or revise the professional valuation used for the review and final report. Valuation comments explain the basis, assumptions or material considerations behind the figures." />
+      <div className="grid gap-3 px-5 pb-5 sm:grid-cols-2 lg:grid-cols-4">
+        <Field label="Currency"><input value={valuation.currency} disabled={!editable || busy} onChange={e => setValuation(v => ({ ...v, currency: e.target.value.toUpperCase() }))} maxLength={3} className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm" /></Field>
+        <Field label="Market value"><input type="number" min="0" value={valuation.marketValue} disabled={!editable || busy} onChange={e => setValuation(v => ({ ...v, marketValue: e.target.value }))} placeholder="0" className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm" /></Field>
+        <Field label="Forced sale value"><input type="number" min="0" value={valuation.forcedSaleValue} disabled={!editable || busy} onChange={e => setValuation(v => ({ ...v, forcedSaleValue: e.target.value }))} placeholder="0" className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm" /></Field>
+        <Field label="Replacement cost"><input type="number" min="0" value={valuation.replacementCost} disabled={!editable || busy} onChange={e => setValuation(v => ({ ...v, replacementCost: e.target.value }))} placeholder="0" className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm" /></Field>
+      </div>
+      <div className="space-y-3 px-5 pb-5">
+        <Field label="Rental estimate"><input type="number" min="0" value={valuation.rentalEstimate} disabled={!editable || busy} onChange={e => setValuation(v => ({ ...v, rentalEstimate: e.target.value }))} placeholder="0" className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm" /></Field>
+        <Field label="Valuation comments"><textarea value={valuation.comments} disabled={!editable || busy} onChange={e => setValuation(v => ({ ...v, comments: e.target.value }))} placeholder="Explain the valuation basis, assumptions, market evidence, adjustments or other professional considerations…" className="min-h-28 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink-faint focus:border-primary focus:ring-2 focus:ring-primary/10" /></Field>
+        <Button loading={busy} disabled={!editable || !valuation.marketValue.trim()} onClick={() => void run(() => api.patch(`/inspections/${inspectionId}/review/valuation`, {
+          currency: valuation.currency.trim() || 'RWF',
+          marketValue: Number(valuation.marketValue),
+          forcedSaleValue: valuation.forcedSaleValue.trim() ? Number(valuation.forcedSaleValue) : undefined,
+          replacementCost: valuation.replacementCost.trim() ? Number(valuation.replacementCost) : undefined,
+          rentalEstimate: valuation.rentalEstimate.trim() ? Number(valuation.rentalEstimate) : undefined,
+          comments: valuation.comments,
+          baseVersion: version,
+        }), 'Professional valuation saved.')}>Save valuation</Button>
+      </div>
+    </Card>
 
     <Card>
       <CardHeader title="Professional adjustments" description="Adjust only information that requires professional judgement. Every adjustment preserves the submitted value." />
@@ -86,14 +119,14 @@ export function ProfessionalReviewPanel({ inspectionId }: { inspectionId: string
         <Field label="Field code"><input value={fieldCode} disabled={!editable || busy} onChange={e => setFieldCode(e.target.value)} placeholder="e.g. LAND_ESTIMATED_VALUE" className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm" /></Field>
         <Field label="Reviewed value"><input value={adjustedValue} disabled={!editable || busy} onChange={e => setAdjustedValue(e.target.value)} placeholder="Value" className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm" /></Field>
         <Field label="Reason"><input value={adjustmentReason} disabled={!editable || busy} onChange={e => setAdjustmentReason(e.target.value)} placeholder="Professional justification" className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm" /></Field>
-        <div className="flex items-end"><Button loading={busy} disabled={!editable || !fieldCode || !adjustedValue || !adjustmentReason || !inspection.reviewer} onClick={() => void run(() => api.post(`/inspections/${inspectionId}/review/adjustments`, { fieldCode, adjustedValue: { value: adjustedValue }, reason: adjustmentReason, baseVersion: version }), 'Adjustment recorded.')}>Record</Button></div>
+        <div className="flex items-end"><Button loading={busy} disabled={!editable || !fieldCode || !adjustedValue || !adjustmentReason} onClick={() => void run(() => api.post(`/inspections/${inspectionId}/review/adjustments`, { fieldCode, adjustedValue: { value: adjustedValue }, reason: adjustmentReason, baseVersion: version }), 'Adjustment recorded.')}>Record</Button></div>
       </div>
       {data.adjustments.length > 0 && <div className="border-t border-line px-5 py-4"><div className="space-y-2">{data.adjustments.map(a => <div key={a.id} className="rounded-xl bg-surface-2 p-3 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><strong>{a.fieldCode}</strong><Badge tone="neutral">{formatDateTime(a.createdAt)}</Badge></div><p className="mt-1 text-ink-muted">Submitted: {JSON.stringify(a.originalValue)} → Reviewed: {JSON.stringify(a.adjustedValue)}</p><p className="mt-1 text-ink-muted">Reason: {a.reason}</p></div>)}</div></div>}
     </Card>
 
     <Card>
       <CardHeader title="Reviewer conclusion" description="This becomes part of the professional review record and official decision trail." />
-      <div className="px-5 pb-5 space-y-3"><Field label="Conclusion"><textarea value={conclusion} disabled={!editable || busy} onChange={e => setConclusion(e.target.value)} placeholder="Summarise professional findings, material exceptions and recommendation…" className="min-h-32 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink-faint focus:border-primary focus:ring-2 focus:ring-primary/10" /></Field><Button loading={busy} disabled={!editable || !conclusion.trim() || !inspection.reviewer} onClick={() => void run(() => api.patch(`/inspections/${inspectionId}/review/conclusion`, { conclusion, baseVersion: version }), 'Conclusion saved.')}>Save conclusion</Button></div>
+      <div className="px-5 pb-5 space-y-3"><Field label="Conclusion"><textarea value={conclusion} disabled={!editable || busy} onChange={e => setConclusion(e.target.value)} placeholder="Summarise professional findings, material exceptions and recommendation…" className="min-h-32 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink-faint focus:border-primary focus:ring-2 focus:ring-primary/10" /></Field><Button loading={busy} disabled={!editable || !conclusion.trim()} onClick={() => void run(() => api.patch(`/inspections/${inspectionId}/review/conclusion`, { conclusion, baseVersion: version }), 'Conclusion saved.')}>Save conclusion</Button></div>
     </Card>
 
     <Card>
