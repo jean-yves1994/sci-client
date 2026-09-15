@@ -1,6 +1,9 @@
-import { ProfessionalReviewPanel } from '@/components/reviews/professional-review-panel';
+'use client';
 
-export default async function ProfessionalReviewPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  return <ProfessionalReviewPanel inspectionId={id} />;
+import { useParams } from 'next/navigation';
+import { ReviewerReviewWorkspace } from '@/components/reviews/reviewer-review-workspace';
+
+export default function ProfessionalReviewPage() {
+  const params = useParams<{ id: string }>();
+  return <ReviewerReviewWorkspace inspectionId={params.id} />;
 }
