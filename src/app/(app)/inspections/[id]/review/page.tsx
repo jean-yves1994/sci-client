@@ -1,6 +1,7 @@
+import { AdminInspectionEditor } from '@/components/reviews/admin-inspection-editor';
 import { ProfessionalReviewPanel } from '@/components/reviews/professional-review-panel';
 
 export default async function ProfessionalReviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return <ProfessionalReviewPanel inspectionId={id} />;
+  return <div className="space-y-4"><AdminInspectionEditor inspectionId={id} /><ProfessionalReviewPanel inspectionId={id} /></div>;
 }
