@@ -31,8 +31,9 @@ const STATUS_OPTIONS = [
 type Scope = 'all' | 'mine';
 
 export default function InspectionsPage() {
-  const { can } = useAuth();
+  const { user, can } = useAuth();
   const searchParams = useSearchParams();
+  const isInspector = Boolean(user?.roles.some((role) => role.trim().toLowerCase() === 'inspector'));
 
   const [result, setResult] = React.useState<Paginated<InspectionListItem> | null>(null);
   const [branches, setBranches] = React.useState<BranchRef[]>([]);
@@ -40,7 +41,6 @@ export default function InspectionsPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
 
-  // Seeded from the query string so the topbar search can deep-link here.
   const [search, setSearch] = React.useState(searchParams.get('search') ?? '');
   const [status, setStatus] = React.useState('');
   const [branchId, setBranchId] = React.useState('');
@@ -49,19 +49,16 @@ export default function InspectionsPage() {
   const [from, setFrom] = React.useState('');
   const [to, setTo] = React.useState('');
   const [scope, setScope] = React.useState<Scope>(
-    searchParams.get('assignedToMe') === 'true' ? 'mine' : 'all',
+    isInspector || searchParams.get('assignedToMe') === 'true' ? 'mine' : 'all',
   );
   const [sortBy, setSortBy] = React.useState('createdAt');
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
   const [page, setPage] = React.useState(1);
   const [showFilters, setShowFilters] = React.useState(false);
 
-  // Debounced so typing a reference does not fire a request per keystroke.
-  const [debouncedSearch, setDebouncedSearch] = React.useState(search);
   React.useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
+    if (isInspector) setScope('mine');
+  }, [isInspector]);
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -69,29 +66,27 @@ export default function InspectionsPage() {
       api.get<Paginated<BranchRef>>('/branches?page=1&pageSize=100', controller.signal)
         .then((r) => setBranches(r.data)).catch(() => undefined);
     }
-    if (can('inspections.assign')) {
+    if (!isInspector && can('inspections.assign')) {
       api.get<Person[]>('/users/inspectors', controller.signal)
         .then(setInspectors).catch(() => undefined);
     }
     return () => controller.abort();
-  }, [can]);
+  }, [can, isInspector]);
 
   React.useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError(null);
 
-    // Filtering, sorting and pagination all run server-side — unchanged from
-    // the previous implementation, which the backend already supports.
     const params = new URLSearchParams({ page: String(page), pageSize: '20', sortBy, sortDir });
     if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
     if (status) params.set('status', status);
     if (branchId) params.set('branchId', branchId);
-    if (inspectorId) params.set('inspectorId', inspectorId);
+    if (!isInspector && inspectorId) params.set('inspectorId', inspectorId);
     if (priority) params.set('priority', priority);
     if (from) params.set('from', new Date(from).toISOString());
     if (to) params.set('to', new Date(to).toISOString());
-    if (scope === 'mine') params.set('assignedToMe', 'true');
+    if (isInspector || scope === 'mine') params.set('assignedToMe', 'true');
 
     api.get<Paginated<InspectionListItem>>(`/inspections?${params}`, controller.signal)
       .then(setResult)
@@ -102,10 +97,14 @@ export default function InspectionsPage() {
       .finally(() => setLoading(false));
 
     return () => controller.abort();
-  }, [page, sortBy, sortDir, debouncedSearch, status, branchId, inspectorId, priority, from, to, scope]);
+  }, [page, sortBy, sortDir, debouncedSearch, status, branchId, inspectorId, priority, from, to, scope, isInspector]);
 
-  // Any filter change returns to page 1; staying on page 7 of a smaller result
-  // set shows an empty table and reads as a bug.
+  const [debouncedSearch, setDebouncedSearch] = React.useState(search);
+  React.useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   React.useEffect(() => {
     setPage(1);
   }, [debouncedSearch, status, branchId, inspectorId, priority, from, to, scope]);
@@ -131,7 +130,7 @@ export default function InspectionsPage() {
           result ? `${result.meta.total.toLocaleString()} record${result.meta.total === 1 ? '' : 's'}` : 'Loading…'
         }
         action={
-          can('inspections.write') ? (
+          !isInspector && can('inspections.write') ? (
             <Segmented<Scope>
               label="Scope"
               value={scope}
@@ -186,7 +185,7 @@ export default function InspectionsPage() {
                 {branches.map((b) => <option key={b.id} value={b.id}>{b.code} — {b.name}</option>)}
               </Select>
             )}
-            {inspectors.length > 0 && (
+            {!isInspector && inspectors.length > 0 && (
               <Select aria-label="Filter by inspector" value={inspectorId} onChange={(e) => setInspectorId(e.target.value)}>
                 <option value="">All inspectors</option>
                 {inspectors.map((i) => <option key={i.id} value={i.id}>{i.firstName} {i.lastName}</option>)}
@@ -200,14 +199,8 @@ export default function InspectionsPage() {
               <option value="LOW">Low</option>
             </Select>
             <div className="flex gap-2">
-              <input
-                type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From date"
-                className="h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-              />
-              <input
-                type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To date"
-                className="h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-              />
+              <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From date" className="h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20" />
+              <input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To date" className="h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20" />
             </div>
             {activeFilters > 0 && (
               <div className="lg:col-span-4">
@@ -219,10 +212,7 @@ export default function InspectionsPage() {
       </Card>
 
       {error && (
-        <Alert
-          title="Could not load inspections"
-          action={<Button size="sm" variant="secondary" onClick={() => setPage(page)}>Retry</Button>}
-        >
+        <Alert title="Could not load inspections" action={<Button size="sm" variant="secondary" onClick={() => setPage(page)}>Retry</Button>}>
           {error}
         </Alert>
       )}
@@ -234,96 +224,35 @@ export default function InspectionsPage() {
           <EmptyState
             icon={<IconClipboard />}
             title={activeFilters > 0 || search ? 'Nothing matches those filters' : 'No inspections yet'}
-            description={
-              activeFilters > 0 || search
-                ? 'Try widening the date range or clearing a filter.'
-                : 'Raise an inspection from the Properties page.'
-            }
-            action={
-              activeFilters > 0 || search ? (
-                <Button variant="secondary" onClick={() => { clearFilters(); setSearch(''); }}>
-                  Clear filters
-                </Button>
-              ) : undefined
-            }
+            description={activeFilters > 0 || search ? 'Try widening the date range or clearing a filter.' : 'No inspections are currently assigned to you.'}
+            action={activeFilters > 0 || search ? <Button variant="secondary" onClick={() => { clearFilters(); setSearch(''); }}>Clear filters</Button> : undefined}
           />
         ) : (
           <>
             <Table label="Inspections">
-              <thead>
-                <tr>
-                  <Th onSort={() => toggleSort('inspectionNumber')} sorted={sortIndicator('inspectionNumber')}>
-                    Inspection
-                  </Th>
-                  <Th>Property</Th>
-                  <Th className="hidden xl:table-cell">Branch</Th>
-                  <Th className="hidden md:table-cell">Inspector</Th>
-                  <Th className="hidden sm:table-cell" onSort={() => toggleSort('priority')} sorted={sortIndicator('priority')}>
-                    Priority
-                  </Th>
-                  <Th onSort={() => toggleSort('status')} sorted={sortIndicator('status')}>Status</Th>
-                  <Th className="hidden sm:table-cell" align="right" onSort={() => toggleSort('dueDate')} sorted={sortIndicator('dueDate')}>
-                    Due
-                  </Th>
-                </tr>
-              </thead>
-              <tbody>
-                {result.data.map((item) => {
-                  const overdue =
-                    item.dueDate && new Date(item.dueDate) < new Date() &&
-                    !['APPROVED', 'REPORT_GENERATED', 'REJECTED', 'ARCHIVED'].includes(item.status);
-
-                  return (
-                    <Tr key={item.id}>
-                      <Td>
-                        <Link href={`/inspections/${item.id}`} className="font-medium text-ink transition-colors hover:text-brand-600">
-                          {item.inspectionNumber}
-                        </Link>
-                        <span className="mt-0.5 block text-2xs text-ink-faint">
-                          {item.loanReference}
-                          {item._count.photos > 0 && ` · ${item._count.photos} photo${item._count.photos === 1 ? '' : 's'}`}
-                        </span>
-                      </Td>
-                      <Td>
-                        <span className="text-sm">{item.property.reference}</span>
-                        <span className="mt-0.5 block max-w-[220px] truncate text-2xs text-ink-faint">
-                          {item.property.propertyType} · {item.property.addressLine}
-                        </span>
-                      </Td>
-                      <Td className="hidden text-xs text-ink-muted xl:table-cell">{item.branch.code}</Td>
-                      <Td className="hidden md:table-cell">
-                        {item.inspector ? (
-                          <span className="flex items-center gap-2">
-                            <Avatar size="sm" name={initials(item.inspector)} tone={avatarTone(item.inspector.id)} />
-                            <span className="text-xs">{fullName(item.inspector)}</span>
-                          </span>
-                        ) : (
-                          <span className="text-xs text-ink-faint">Unassigned</span>
-                        )}
-                      </Td>
-                      <Td className="hidden sm:table-cell">
-                        <Badge tone={priorityTone(item.priority)}>{humanise(item.priority)}</Badge>
-                      </Td>
-                      <Td>
-                        <StatusBadge tone={statusTone(item.status)}>{statusLabel(item.status)}</StatusBadge>
-                      </Td>
-                      <Td align="right" className="hidden whitespace-nowrap sm:table-cell">
-                        <span className={cx('text-xs', overdue ? 'font-medium text-danger-fg' : 'text-ink-muted')}>
-                          {formatDate(item.dueDate)}
-                          {overdue && <span className="sr-only"> (overdue)</span>}
-                        </span>
-                      </Td>
-                    </Tr>
-                  );
-                })}
-              </tbody>
+              <thead><tr>
+                <Th onSort={() => toggleSort('inspectionNumber')} sorted={sortIndicator('inspectionNumber')}>Inspection</Th>
+                <Th>Property</Th>
+                <Th className="hidden xl:table-cell">Branch</Th>
+                <Th className="hidden md:table-cell">Inspector</Th>
+                <Th className="hidden sm:table-cell" onSort={() => toggleSort('priority')} sorted={sortIndicator('priority')}>Priority</Th>
+                <Th onSort={() => toggleSort('status')} sorted={sortIndicator('status')}>Status</Th>
+                <Th className="hidden sm:table-cell" align="right" onSort={() => toggleSort('dueDate')} sorted={sortIndicator('dueDate')}>Due</Th>
+              </tr></thead>
+              <tbody>{result.data.map((item) => {
+                const overdue = item.dueDate && new Date(item.dueDate) < new Date() && !['APPROVED', 'REPORT_GENERATED', 'REJECTED', 'ARCHIVED'].includes(item.status);
+                return <Tr key={item.id}>
+                  <Td><Link href={`/inspections/${item.id}`} className="font-medium text-ink transition-colors hover:text-brand-600">{item.inspectionNumber}</Link><span className="mt-0.5 block text-2xs text-ink-faint">{item.loanReference}{item._count.photos > 0 && ` · ${item._count.photos} photo${item._count.photos === 1 ? '' : 's'}`}</span></Td>
+                  <Td><span className="text-sm">{item.property.reference}</span><span className="mt-0.5 block max-w-[220px] truncate text-2xs text-ink-faint">{item.property.propertyType} · {item.property.addressLine}</span></Td>
+                  <Td className="hidden text-xs text-ink-muted xl:table-cell">{item.branch.code}</Td>
+                  <Td className="hidden md:table-cell">{item.inspector ? <span className="flex items-center gap-2"><Avatar size="sm" name={initials(item.inspector)} tone={avatarTone(item.inspector.id)} /><span className="text-xs">{fullName(item.inspector)}</span></span> : <span className="text-xs text-ink-faint">Unassigned</span>}</Td>
+                  <Td className="hidden sm:table-cell"><Badge tone={priorityTone(item.priority)}>{humanise(item.priority)}</Badge></Td>
+                  <Td><StatusBadge tone={statusTone(item.status)}>{statusLabel(item.status)}</StatusBadge></Td>
+                  <Td align="right" className="hidden whitespace-nowrap sm:table-cell"><span className={cx('text-xs', overdue ? 'font-medium text-danger-fg' : 'text-ink-muted')}>{formatDate(item.dueDate)}{overdue && <span className="sr-only"> (overdue)</span>}</span></Td>
+                </Tr>;
+              })}</tbody>
             </Table>
-            <Pagination
-              page={result.meta.page}
-              totalPages={result.meta.totalPages}
-              total={result.meta.total}
-              onChange={setPage}
-            />
+            <Pagination page={result.meta.page} totalPages={result.meta.totalPages} total={result.meta.total} onChange={setPage} />
           </>
         )}
       </Card>
