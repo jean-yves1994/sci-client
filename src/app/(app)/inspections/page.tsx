@@ -48,13 +48,13 @@ export default function InspectionsPage() {
   const [priority, setPriority] = React.useState('');
   const [from, setFrom] = React.useState('');
   const [to, setTo] = React.useState('');
-  const [scope, setScope] = React.useState<Scope>(
-    isInspector || searchParams.get('assignedToMe') === 'true' ? 'mine' : 'all',
-  );
   const [sortBy, setSortBy] = React.useState('createdAt');
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
   const [page, setPage] = React.useState(1);
   const [showFilters, setShowFilters] = React.useState(false);
+  const [scope, setScope] = React.useState<Scope>(
+    isInspector || searchParams.get('assignedToMe') === 'true' ? 'mine' : 'all',
+  );
 
   React.useEffect(() => {
     if (isInspector) setScope('mine');
@@ -72,6 +72,13 @@ export default function InspectionsPage() {
     }
     return () => controller.abort();
   }, [can, isInspector]);
+
+  const [debouncedSearch, setDebouncedSearch] = React.useState(search);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -99,12 +106,6 @@ export default function InspectionsPage() {
     return () => controller.abort();
   }, [page, sortBy, sortDir, debouncedSearch, status, branchId, inspectorId, priority, from, to, scope, isInspector]);
 
-  const [debouncedSearch, setDebouncedSearch] = React.useState(search);
-  React.useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-
   React.useEffect(() => {
     setPage(1);
   }, [debouncedSearch, status, branchId, inspectorId, priority, from, to, scope]);
@@ -129,133 +130,109 @@ export default function InspectionsPage() {
         description={
           result ? `${result.meta.total.toLocaleString()} record${result.meta.total === 1 ? '' : 's'}` : 'Loading…'
         }
-        action={
-          !isInspector && can('inspections.write') ? (
-            <Segmented<Scope>
-              label="Scope"
-              value={scope}
-              onChange={setScope}
-              options={[{ value: 'all', label: 'All' }, { value: 'mine', label: 'Assigned to me' }]}
-            />
-          ) : undefined
+        actions={
+          <div className="flex items-center gap-2">
+            {!isInspector && (
+              <Segmented
+                value={scope}
+                onChange={(value) => setScope(value as Scope)}
+                options={[{ value: 'all', label: 'All' }, { value: 'mine', label: 'Assigned to me' }]}
+              />
+            )}
+            <Button variant="secondary" onClick={() => setShowFilters((value) => !value)}>
+              <IconFilter className="mr-2 h-4 w-4" />
+              Filters{activeFilters > 0 ? ` (${activeFilters})` : ''}
+            </Button>
+          </div>
         }
       />
 
-      <Card className="p-3">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <div className="min-w-[220px] flex-1">
-            <SearchInput
-              placeholder="Search number, loan reference, property or owner"
-              aria-label="Search inspections"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onClear={() => setSearch('')}
-            />
-          </div>
+      {error && <Alert variant="error">{error}</Alert>}
 
-          <Select
-            className="w-auto min-w-[160px]"
-            aria-label="Filter by status"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-          >
-            {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </Select>
-
-          <Button
-            variant={showFilters ? 'primary' : 'secondary'}
-            icon={<IconFilter className="h-4 w-4" />}
-            onClick={() => setShowFilters((open) => !open)}
-            aria-expanded={showFilters}
-          >
-            Filters
-            {activeFilters > 0 && (
-              <span className="ml-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-white/25 px-1 text-[10px] font-bold">
-                {activeFilters}
-              </span>
-            )}
-          </Button>
+      <Card className="p-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <SearchInput value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search inspections…" />
+          {isInspector && (
+            <Badge tone="neutral">Assigned to me</Badge>
+          )}
         </div>
 
         {showFilters && (
-          <div className="mt-3 grid gap-2.5 border-t border-line pt-3 lg:grid-cols-4">
-            {branches.length > 0 && (
-              <Select aria-label="Filter by branch" value={branchId} onChange={(e) => setBranchId(e.target.value)}>
-                <option value="">All branches</option>
-                {branches.map((b) => <option key={b.id} value={b.id}>{b.code} — {b.name}</option>)}
-              </Select>
+          <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+            <Select value={status} onChange={(event) => setStatus(event.target.value)} options={STATUS_OPTIONS} />
+            {!isInspector && (
+              <Select
+                value={inspectorId}
+                onChange={(event) => setInspectorId(event.target.value)}
+                options={[{ value: '', label: 'All inspectors' }, ...inspectors.map((inspector) => ({ value: inspector.id, label: fullName(inspector) }))]}
+              />
             )}
-            {!isInspector && inspectors.length > 0 && (
-              <Select aria-label="Filter by inspector" value={inspectorId} onChange={(e) => setInspectorId(e.target.value)}>
-                <option value="">All inspectors</option>
-                {inspectors.map((i) => <option key={i.id} value={i.id}>{i.firstName} {i.lastName}</option>)}
-              </Select>
+            {can('branches.read') && (
+              <Select
+                value={branchId}
+                onChange={(event) => setBranchId(event.target.value)}
+                options={[{ value: '', label: 'All branches' }, ...branches.map((branch) => ({ value: branch.id, label: `${branch.code} — ${branch.name}` }))]}
+              />
             )}
-            <Select aria-label="Filter by priority" value={priority} onChange={(e) => setPriority(e.target.value)}>
-              <option value="">Any priority</option>
-              <option value="URGENT">Urgent</option>
-              <option value="HIGH">High</option>
-              <option value="NORMAL">Normal</option>
-              <option value="LOW">Low</option>
-            </Select>
-            <div className="flex gap-2">
-              <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From date" className="h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20" />
-              <input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To date" className="h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20" />
-            </div>
-            {activeFilters > 0 && (
-              <div className="lg:col-span-4">
-                <Button size="sm" variant="ghost" onClick={clearFilters}>Clear all filters</Button>
-              </div>
-            )}
+            <Select
+              value={priority}
+              onChange={(event) => setPriority(event.target.value)}
+              options={[{ value: '', label: 'All priorities' }, { value: 'LOW', label: 'Low' }, { value: 'NORMAL', label: 'Normal' }, { value: 'HIGH', label: 'High' }, { value: 'URGENT', label: 'Urgent' }]}
+            />
           </div>
         )}
       </Card>
 
-      {error && (
-        <Alert title="Could not load inspections" action={<Button size="sm" variant="secondary" onClick={() => setPage(page)}>Retry</Button>}>
-          {error}
-        </Alert>
-      )}
-
-      <Card>
-        {loading ? (
-          <TableSkeleton rows={8} columns={6} />
-        ) : !result || result.data.length === 0 ? (
-          <EmptyState
-            icon={<IconClipboard />}
-            title={activeFilters > 0 || search ? 'Nothing matches those filters' : 'No inspections yet'}
-            description={activeFilters > 0 || search ? 'Try widening the date range or clearing a filter.' : 'No inspections are currently assigned to you.'}
-            action={activeFilters > 0 || search ? <Button variant="secondary" onClick={() => { clearFilters(); setSearch(''); }}>Clear filters</Button> : undefined}
-          />
-        ) : (
-          <>
-            <Table label="Inspections">
-              <thead><tr>
-                <Th onSort={() => toggleSort('inspectionNumber')} sorted={sortIndicator('inspectionNumber')}>Inspection</Th>
+      {loading ? <TableSkeleton rows={8} /> : !result?.data.length ? (
+        <EmptyState icon={<IconClipboard className="h-8 w-8" />} title="No inspections found" description={isInspector ? 'There are no inspections currently assigned to you.' : 'Try adjusting your filters or search terms.'} />
+      ) : (
+        <Card className="overflow-hidden">
+          <Table>
+            <thead>
+              <Tr>
+                <Th onClick={() => toggleSort('inspectionNumber')}>Inspection</Th>
                 <Th>Property</Th>
-                <Th className="hidden xl:table-cell">Branch</Th>
-                <Th className="hidden md:table-cell">Inspector</Th>
-                <Th className="hidden sm:table-cell" onSort={() => toggleSort('priority')} sorted={sortIndicator('priority')}>Priority</Th>
-                <Th onSort={() => toggleSort('status')} sorted={sortIndicator('status')}>Status</Th>
-                <Th className="hidden sm:table-cell" align="right" onSort={() => toggleSort('dueDate')} sorted={sortIndicator('dueDate')}>Due</Th>
-              </tr></thead>
-              <tbody>{result.data.map((item) => {
-                const overdue = item.dueDate && new Date(item.dueDate) < new Date() && !['APPROVED', 'REPORT_GENERATED', 'REJECTED', 'ARCHIVED'].includes(item.status);
-                return <Tr key={item.id}>
-                  <Td><Link href={`/inspections/${item.id}`} className="font-medium text-ink transition-colors hover:text-brand-600">{item.inspectionNumber}</Link><span className="mt-0.5 block text-2xs text-ink-faint">{item.loanReference}{item._count.photos > 0 && ` · ${item._count.photos} photo${item._count.photos === 1 ? '' : 's'}`}</span></Td>
-                  <Td><span className="text-sm">{item.property.reference}</span><span className="mt-0.5 block max-w-[220px] truncate text-2xs text-ink-faint">{item.property.propertyType} · {item.property.addressLine}</span></Td>
-                  <Td className="hidden text-xs text-ink-muted xl:table-cell">{item.branch.code}</Td>
-                  <Td className="hidden md:table-cell">{item.inspector ? <span className="flex items-center gap-2"><Avatar size="sm" name={initials(item.inspector)} tone={avatarTone(item.inspector.id)} /><span className="text-xs">{fullName(item.inspector)}</span></span> : <span className="text-xs text-ink-faint">Unassigned</span>}</Td>
-                  <Td className="hidden sm:table-cell"><Badge tone={priorityTone(item.priority)}>{humanise(item.priority)}</Badge></Td>
-                  <Td><StatusBadge tone={statusTone(item.status)}>{statusLabel(item.status)}</StatusBadge></Td>
-                  <Td align="right" className="hidden whitespace-nowrap sm:table-cell"><span className={cx('text-xs', overdue ? 'font-medium text-danger-fg' : 'text-ink-muted')}>{formatDate(item.dueDate)}{overdue && <span className="sr-only"> (overdue)</span>}</span></Td>
-                </Tr>;
-              })}</tbody>
-            </Table>
-            <Pagination page={result.meta.page} totalPages={result.meta.totalPages} total={result.meta.total} onChange={setPage} />
-          </>
-        )}
-      </Card>
+                <Th>Status</Th>
+                <Th>Priority</Th>
+                <Th>Inspector</Th>
+                <Th onClick={() => toggleSort('dueDate')}>Due</Th>
+                <Th />
+              </Tr>
+            </thead>
+            <tbody>
+              {result.data.map((inspection) => (
+                <Tr key={inspection.id}>
+                  <Td>
+                    <Link className="font-medium hover:underline" href={`/inspections/${inspection.id}`}>{inspection.inspectionNumber}</Link>
+                    <div className="text-xs text-muted-foreground">{inspection.loanReference}</div>
+                  </Td>
+                  <Td>
+                    <div className="font-medium">{inspection.property.reference}</div>
+                    <div className="text-xs text-muted-foreground">{inspection.property.addressLine}</div>
+                  </Td>
+                  <Td><StatusBadge tone={statusTone(inspection.status)}>{statusLabel(inspection.status)}</StatusBadge></Td>
+                  <Td><Badge tone={priorityTone(inspection.priority)}>{humanise(inspection.priority)}</Badge></Td>
+                  <Td>
+                    {inspection.inspector ? (
+                      <div className="flex items-center gap-2">
+                        <Avatar initials={initials(inspection.inspector)} tone={avatarTone(inspection.inspector.id)} />
+                        <span>{fullName(inspection.inspector)}</span>
+                      </div>
+                    ) : '—'}
+                  </Td>
+                  <Td>{formatDate(inspection.dueDate)}</Td>
+                  <Td className="text-right">
+                    <Link className="text-sm font-medium hover:underline" href={`/inspections/${inspection.id}`}>View</Link>
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+          <div className="border-t p-3">
+            <Pagination meta={result.meta} page={page} onPageChange={setPage} />
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
