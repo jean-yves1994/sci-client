@@ -37,7 +37,7 @@ export function AdminInspectionEditor({ inspectionId }: { inspectionId: string }
   if (!allowed) return null;
   if (!inspection) return error ? <Alert title="Administrative editor unavailable">{error}</Alert> : <Card><div className="p-5 text-sm text-ink-muted">Loading administrative editor…</div></Card>;
 
-  const editable = !['APPROVED', 'REPORT_GENERATED', 'ARCHIVED'].includes(inspection.status);
+  const editable = !['APPROVED', 'REPORT_GENERATED', 'REJECTED', 'ARCHIVED'].includes(inspection.status);
   const assignReviewer = async () => {
     if (!selectedReviewerId || !reviewerReason.trim()) return;
     setBusy(true); setError(null);
@@ -90,15 +90,15 @@ export function AdminInspectionEditor({ inspectionId }: { inspectionId: string }
       <h3 className="mb-3 text-sm font-semibold text-ink">Professional reviewer assignment</h3>
       <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
         <Field label="Assigned reviewer">
-          <select value={selectedReviewerId} disabled={busy} onChange={(e) => setSelectedReviewerId(e.target.value)} className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm">
+          <select value={selectedReviewerId} disabled={!editable || busy} onChange={(e) => setSelectedReviewerId(e.target.value)} className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm">
             <option value="">Select a reviewer</option>
             {reviewers.map((reviewer) => <option key={reviewer.id} value={reviewer.id}>{reviewer.firstName} {reviewer.lastName} ({reviewer.email})</option>)}
           </select>
         </Field>
         <Field label="Reason for assignment / reassignment">
-          <input value={reviewerReason} disabled={busy} onChange={(e) => setReviewerReason(e.target.value)} placeholder="Enter the reason" className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm"/>
+          <input value={reviewerReason} disabled={!editable || busy} onChange={(e) => setReviewerReason(e.target.value)} placeholder="Enter the reason" className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm"/>
         </Field>
-        <Button loading={busy} disabled={busy || !selectedReviewerId || !reviewerReason.trim() || selectedReviewerId === (inspection.reviewer?.id ?? '')} onClick={() => void assignReviewer()}>
+        <Button loading={busy} disabled={!editable || busy || !selectedReviewerId || !reviewerReason.trim() || selectedReviewerId === (inspection.reviewer?.id ?? '')} onClick={() => void assignReviewer()}>
           {inspection.reviewer ? 'Reassign reviewer' : 'Assign reviewer'}
         </Button>
       </div>
