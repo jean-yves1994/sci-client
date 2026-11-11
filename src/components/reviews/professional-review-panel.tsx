@@ -14,6 +14,7 @@ const PROPERTY_USE_OPTIONS=[['RESIDENTIAL','Residential'],['COMMERCIAL','Commerc
 type DecisionModal = 'correction' | 'reject' | null;
 
 export function ProfessionalReviewPanel({inspectionId}:{inspectionId:string}){
+ const {user}=useAuth();
  const[data,setData]=React.useState<(ReviewWorkspace&{inspection:ReviewInspection})|null>(null);
  const[error,setError]=React.useState<string|null>(null);
  const[notice,setNotice]=React.useState<string|null>(null);
