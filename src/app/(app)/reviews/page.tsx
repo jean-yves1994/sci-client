@@ -54,7 +54,7 @@ export default function ReviewQueuePage() {
     <div className="space-y-6">
       <PageHeader
         title="Review queue"
-        description="Submitted inspections awaiting a decision, oldest first."
+        description="Unclaimed submitted inspections available for reviewers to claim, oldest first."
       />
 
       {notice && <Alert tone="success" title={notice} />}
