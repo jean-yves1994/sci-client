@@ -17,7 +17,7 @@ export function AdminInspectionEditor({ inspectionId }: { inspectionId: string }
   const [notice, setNotice] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
 
-  const isAdmin = Boolean(user?.roles.some((r) => r.trim().toLowerCase() === 'admin'));
+  const isAdmin = Boolean(user?.roles.some((r) => ['admin', 'administrator'].includes(r.trim().toLowerCase())));
   const allowed = isAdmin && can('inspections.write');
 
   const load = React.useCallback(async () => {
