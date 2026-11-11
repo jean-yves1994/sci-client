@@ -19,6 +19,7 @@ export default function ReviewQueuePage() {
   const [loading, setLoading] = React.useState(true);
   const [page, setPage] = React.useState(1);
   const [claimingId, setClaimingId] = React.useState<string | null>(null);
+  const [notice, setNotice] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     api.get<Dashboard>('/analytics/dashboard').then(setSummary).catch(() => undefined);
@@ -41,6 +42,7 @@ export default function ReviewQueuePage() {
       await api.post(`/inspections/${id}/begin-review`);
       const refreshed = await api.get<Paginated<InspectionListItem>>(`/reviews/queue?page=${page}&pageSize=20`);
       setResult(refreshed);
+      setNotice('Inspection claimed. You can now find it under Inspections.');
     } catch (caught) {
       setError(readableError(caught));
     } finally {
@@ -54,6 +56,8 @@ export default function ReviewQueuePage() {
         title="Review queue"
         description="Submitted inspections awaiting a decision, oldest first."
       />
+
+      {notice && <Alert tone="success" title={notice} />}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
