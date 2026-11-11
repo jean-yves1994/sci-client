@@ -33,7 +33,7 @@ type Scope = 'all' | 'mine';
 export default function InspectionsPage() {
   const { user, can } = useAuth();
   const searchParams = useSearchParams();
-  const isInspector = Boolean(user?.roles.some((role) => role.trim().toLowerCase() === 'inspector'));
+  const isInspector = Boolean(user?.roles.some((role) => role.trim().toLowerCase() === 'inspector')) && !can('reviews.decide');
 
   const [result, setResult] = React.useState<Paginated<InspectionListItem> | null>(null);
   const [branches, setBranches] = React.useState<BranchRef[]>([]);
