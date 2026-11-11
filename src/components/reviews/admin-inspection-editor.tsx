@@ -27,16 +27,13 @@ export function AdminInspectionEditor({ inspectionId }: { inspectionId: string }
       const d = await api.get<InspectionDetail>(`/inspections/${inspectionId}`);
       setInspection(d);
       setSelectedReviewerId(d.reviewer?.id ?? '');
+      api.get<Person[]>(`/users/reviewers?branchId=${d.branch.id}`).then(setReviewers).catch((e) => setError(readableError(e)));
       setValues(Object.fromEntries(d.values.map((v) => [v.field.id, toEditValue(v)])));
       setOwner(d.owner ? { fullName: d.owner.fullName ?? '', phone: d.owner.phone ?? '', email: d.owner.email ?? '', occupancyStatus: d.owner.occupancyStatus ?? '', ownershipType: d.owner.ownershipType ?? '' } : { fullName: '', phone: '', email: '', occupancyStatus: '', ownershipType: '' });
     } catch (e) { setError(readableError(e)); }
   }, [allowed, inspectionId]);
 
   React.useEffect(() => { void load(); }, [load]);
-  React.useEffect(() => {
-    if (!allowed) return;
-    api.get<Person[]>('/users/reviewers').then(setReviewers).catch((e) => setError(readableError(e)));
-  }, [allowed]);
   if (!allowed) return null;
   if (!inspection) return error ? <Alert title="Administrative editor unavailable">{error}</Alert> : <Card><div className="p-5 text-sm text-ink-muted">Loading administrative editor…</div></Card>;
 
