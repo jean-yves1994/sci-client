@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import * as React from 'react';
 import {
-  Alert, Avatar, Badge, Card, EmptyState, PageHeader, Pagination, StatCard,
+  Alert, Avatar, Badge, Button, Card, EmptyState, PageHeader, Pagination, StatCard,
   StatusBadge, Table, TableSkeleton, Td, Th, Tr,
 } from '@/components/ui';
 import { IconCheckCircle, IconClock, IconInbox } from '@/components/icons';
@@ -19,6 +19,7 @@ export default function ReviewQueuePage() {
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [page, setPage] = React.useState(1);
+  const [claimingId, setClaimingId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     api.get<Dashboard>('/analytics/dashboard').then(setSummary).catch(() => undefined);
@@ -33,6 +34,20 @@ export default function ReviewQueuePage() {
   }, [page]);
 
   const oldest = result?.data[0];
+
+  const claimInspection = async (id: string) => {
+    setClaimingId(id);
+    setError(null);
+    try {
+      await api.post(`/inspections/${id}/begin-review`);
+      const refreshed = await api.get<Paginated<InspectionListItem>>(`/reviews/queue?page=${page}&pageSize=20`);
+      setResult(refreshed);
+    } catch (caught) {
+      setError(readableError(caught));
+    } finally {
+      setClaimingId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -77,7 +92,7 @@ export default function ReviewQueuePage() {
           <EmptyState
             icon={<IconCheckCircle />}
             title="Nothing is waiting"
-            description="Every submitted inspection has been dealt with."
+            description="There are currently no unclaimed inspections awaiting review."
           />
         ) : (
           <>
@@ -96,7 +111,6 @@ export default function ReviewQueuePage() {
               </thead>
               <tbody>
                 {result.data.map((item) => {
-                  const assignedToCurrentReviewer = Boolean(item.reviewer);
                   return (
                     <Tr key={item.id}>
                       <Td>
@@ -150,13 +164,15 @@ export default function ReviewQueuePage() {
                         </StatusBadge>
                       </Td>
                       <Td align="right">
-                        <Link
-                          href={`/inspections/${item.id}/review`}
-                          className="inline-flex items-center justify-center whitespace-nowrap rounded-xl bg-brand-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
-                          aria-label={`${assignedToCurrentReviewer ? 'Edit' : 'Open'} ${item.inspectionNumber} review`}
+                        <Button
+                          size="sm"
+                          loading={claimingId === item.id}
+                          disabled={claimingId !== null}
+                          onClick={() => void claimInspection(item.id)}
+                          aria-label={`Claim ${item.inspectionNumber} for review`}
                         >
-                          {assignedToCurrentReviewer ? 'Edit inspection' : 'Open review'}
-                        </Link>
+                          Claim for review
+                        </Button>
                       </Td>
                     </Tr>
                   );
