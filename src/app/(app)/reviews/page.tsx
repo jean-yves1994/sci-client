@@ -114,12 +114,7 @@ export default function ReviewQueuePage() {
                   return (
                     <Tr key={item.id}>
                       <Td>
-                        <Link
-                          href={`/inspections/${item.id}`}
-                          className="font-semibold text-ink transition-colors hover:text-brand-600"
-                        >
-                          {item.inspectionNumber}
-                        </Link>
+                        <span className="font-semibold text-ink">{item.inspectionNumber}</span>
                         <span className="mt-0.5 block text-xs text-ink-faint">
                           {item.loanReference}
                         </span>
