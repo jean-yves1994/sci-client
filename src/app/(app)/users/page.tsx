@@ -36,6 +36,7 @@ export default function UsersPage() {
   const [showCreate, setShowCreate] = React.useState(false);
   const [resetFor, setResetFor] = React.useState<UserRow | null>(null);
   const [newPassword, setNewPassword] = React.useState('');
+  const [resetError, setResetError] = React.useState<string | null>(null);
 
   const [form, setForm] = React.useState({
     email: '', firstName: '', lastName: '', password: '', phone: '',
@@ -53,7 +54,28 @@ export default function UsersPage() {
   const closeReset = React.useCallback(() => {
     setResetFor(null);
     setNewPassword('');
+    setResetError(null);
   }, []);
+
+  const submitPasswordReset = async () => {
+    const target = resetFor;
+    if (!target) return;
+    setBusy(true);
+    setResetError(null);
+    setError(null);
+    setNotice(null);
+    try {
+      await api.post(`/users/${target.id}/reset-password`, { newPassword });
+      setNotice('Password reset. Every session for that account has been ended.');
+      closeReset();
+      await load();
+    } catch (caught) {
+      // Keep password-policy and API validation errors inside the reset modal.
+      setResetError(readableError(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const [debounced, setDebounced] = React.useState('');
   React.useEffect(() => {
@@ -239,7 +261,7 @@ export default function UsersPage() {
                             </Button>
                           )}
                           {can('users.reset_password') && (
-                            <Button size="sm" variant="ghost" onClick={() => setResetFor(person)}>
+                            <Button size="sm" variant="ghost" onClick={() => { setResetError(null); setNewPassword(''); setResetFor(person); }}>
                               Reset
                             </Button>
                           )}
@@ -358,26 +380,24 @@ export default function UsersPage() {
             </Button>
             <Button
               loading={busy} disabled={newPassword.length < 8}
-              onClick={() => {
-                const target = resetFor;
-                if (!target) return;
-                void act(
-                  () => api.post(`/users/${target.id}/reset-password`, { newPassword }),
-                  'Password reset. Every session for that account has been ended.',
-                ).then(closeReset);
-              }}
+              onClick={() => void submitPasswordReset()}
             >
               Reset password
             </Button>
           </>
         }
       >
+        {resetError && (
+          <Alert tone="danger" title="Password validation failed" onDismiss={() => setResetError(null)}>
+            {resetError}
+          </Alert>
+        )}
         <Field
           label="New temporary password" required
           hint="Use at least 8 characters, including an uppercase letter, a lowercase letter, a number and a symbol. The user must change it at next sign-in, and all their sessions end immediately."
         >
           <Input value={newPassword} minLength={8} placeholder="Min 8 characters"
-            onChange={(e) => setNewPassword(e.target.value)} />
+            onChange={(e) => { setNewPassword(e.target.value); setResetError(null); }} />
         </Field>
       </Modal>
     </div>
