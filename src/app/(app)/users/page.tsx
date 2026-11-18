@@ -300,9 +300,9 @@ export default function UsersPage() {
           </Field>
           <Field
             label="Temporary password" required
-            hint="At least 12 characters, with upper, lower and a digit."
+            hint="Use at least 8 characters, including an uppercase letter, a lowercase letter, a number and a symbol."
           >
-            <Input required minLength={12} value={form.password}
+            <Input required minLength={8} placeholder="Min 8 characters" value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })} />
           </Field>
           <Field label="Phone">
@@ -357,7 +357,7 @@ export default function UsersPage() {
               Cancel
             </Button>
             <Button
-              loading={busy} disabled={newPassword.length < 12}
+              loading={busy} disabled={newPassword.length < 8}
               onClick={() => {
                 const target = resetFor;
                 if (!target) return;
@@ -374,9 +374,9 @@ export default function UsersPage() {
       >
         <Field
           label="New temporary password" required
-          hint="The user must change it at next sign-in, and all their sessions end immediately."
+          hint="Use at least 8 characters, including an uppercase letter, a lowercase letter, a number and a symbol. The user must change it at next sign-in, and all their sessions end immediately."
         >
-          <Input value={newPassword} minLength={12}
+          <Input value={newPassword} minLength={8} placeholder="Min 8 characters"
             onChange={(e) => setNewPassword(e.target.value)} />
         </Field>
       </Modal>
