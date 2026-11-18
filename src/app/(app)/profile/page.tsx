@@ -96,10 +96,10 @@ export default function ProfilePage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <Field
               label="New password" required
-              hint="At least 12 characters, with upper, lower and a digit."
+              hint="Use at least 8 characters, including an uppercase letter, a lowercase letter, a number and a symbol."
             >
               <Input
-                type="password" autoComplete="new-password" required minLength={12}
+                type="password" autoComplete="new-password" required minLength={8} placeholder="Min 8 characters"
                 value={next} onChange={(e) => setNext(e.target.value)}
               />
             </Field>
